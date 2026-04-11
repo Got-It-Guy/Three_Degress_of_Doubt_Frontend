@@ -1,4 +1,4 @@
-package com.example.three_degress_of_doubt_frontend
+package com.threedegreesofdoubt.frontend
 
 import io.flutter.embedding.android.FlutterActivity
 
