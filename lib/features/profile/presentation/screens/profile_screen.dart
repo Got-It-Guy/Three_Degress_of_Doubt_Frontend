@@ -1,7 +1,181 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 
-class ProfileScreen extends StatelessWidget {
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
+import 'package:three_degress_of_doubt_frontend/features/auth/data/auth_repository.dart';
+
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final _authRepository = AppDependencies.authRepository;
+
+  SyncedUser? _profile;
+  bool _isLoadingProfile = true;
+  String? _profileErrorMessage;
+  bool _isSigningOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMyProfile();
+  }
+
+  Future<void> _loadMyProfile() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingProfile = true;
+      _profileErrorMessage = null;
+    });
+
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw StateError('로그인 정보가 없습니다. 다시 로그인해 주세요.');
+      }
+
+      final idToken = await currentUser.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw StateError('인증 토큰 발급에 실패했습니다.');
+      }
+
+      final profile = await _authRepository.fetchMyProfile(idToken: idToken);
+      if (!mounted) return;
+      setState(() => _profile = profile);
+    } on Exception catch (error) {
+      if (!mounted) return;
+      setState(() => _profileErrorMessage = _mapProfileError(error));
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingProfile = false);
+      }
+    }
+  }
+
+  Future<void> _handleSignOut() async {
+    if (_isSigningOut) {
+      return;
+    }
+
+    setState(() => _isSigningOut = true);
+    try {
+      await _authRepository.signOut();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+    } on Exception {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('로그아웃 중 오류가 발생했습니다.')));
+    } finally {
+      if (mounted) {
+        setState(() => _isSigningOut = false);
+      }
+    }
+  }
+
+  String get _displayNickname {
+    final nickname = _profile?.nickname?.trim();
+    if (nickname != null && nickname.isNotEmpty) {
+      return nickname;
+    }
+    final displayName = FirebaseAuth.instance.currentUser?.displayName?.trim();
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+    return '닉네임 미설정';
+  }
+
+  String get _displayEmail {
+    final email = _profile?.email?.trim();
+    if (email != null && email.isNotEmpty) {
+      return email;
+    }
+    final authEmail = FirebaseAuth.instance.currentUser?.email?.trim();
+    if (authEmail != null && authEmail.isNotEmpty) {
+      return authEmail;
+    }
+    return '이메일 정보 없음';
+  }
+
+  String _mapProfileError(Object error) {
+    final text = error.toString();
+    if (text.contains('401') || text.contains('403')) {
+      return '세션이 만료되었습니다. 다시 로그인해 주세요.';
+    }
+    if (text.contains('timed out') || text.contains('SocketException')) {
+      return '서버에 연결할 수 없습니다. 네트워크를 확인해 주세요.';
+    }
+    return '프로필 정보를 불러오지 못했습니다.';
+  }
+
+  Uint8List? _decodeDataUrl(String? value) {
+    if (value == null || !value.startsWith('data:')) {
+      return null;
+    }
+    final commaIndex = value.indexOf(',');
+    if (commaIndex < 0) {
+      return null;
+    }
+    final metadata = value.substring(0, commaIndex).toLowerCase();
+    if (!metadata.contains(';base64')) {
+      return null;
+    }
+    final raw = value.substring(commaIndex + 1);
+    try {
+      return base64Decode(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _buildProfileAvatar({
+    required Color primaryGreen,
+    required Color borderColor,
+  }) {
+    final imageSource = _profile?.profileImageUrl?.trim();
+    final imageBytes = _decodeDataUrl(imageSource);
+
+    Widget content;
+    if (imageBytes != null) {
+      content = Image.memory(
+        imageBytes,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) {
+          return const Icon(Icons.person, size: 48, color: Color(0xFF00D64F));
+        },
+      );
+    } else if (imageSource != null &&
+        (imageSource.startsWith('http://') || imageSource.startsWith('https://'))) {
+      content = Image.network(
+        imageSource,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) {
+          return const Icon(Icons.person, size: 48, color: Color(0xFF00D64F));
+        },
+      );
+    } else {
+      content = const Icon(Icons.person, size: 48, color: Color(0xFF00D64F));
+    }
+
+    return Container(
+      width: 96,
+      height: 96,
+      decoration: BoxDecoration(
+        color: primaryGreen.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+        border: Border.all(color: borderColor),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: content,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,25 +229,43 @@ class ProfileScreen extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 32.0),
                       child: Column(
                         children: [
-                          Container(
-                            width: 96,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              color: primaryGreen.withValues(alpha: 0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.person, size: 48, color: primaryGreen),
+                          _buildProfileAvatar(
+                            primaryGreen: primaryGreen,
+                            borderColor: borderColor,
                           ),
                           const SizedBox(height: 16),
-                          const Text(
-                            '홍길동',
-                            style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                          Text(
+                            _isLoadingProfile ? '불러오는 중...' : _displayNickname,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            'user@example.com',
-                            style: TextStyle(color: subtitleColor, fontSize: 14),
+                          Text(
+                            _isLoadingProfile ? '프로필 정보를 가져오는 중입니다' : _displayEmail,
+                            style: const TextStyle(color: subtitleColor, fontSize: 14),
                           ),
+                          if (_profileErrorMessage != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              _profileErrorMessage!,
+                              style: const TextStyle(
+                                color: Color(0xFFFF6D6D),
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            TextButton(
+                              onPressed: _isLoadingProfile ? null : _loadMyProfile,
+                              style: TextButton.styleFrom(
+                                foregroundColor: subtitleColor,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                              ),
+                              child: const Text('다시 시도'),
+                            ),
+                          ],
                           const SizedBox(height: 12),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -133,22 +325,26 @@ class ProfileScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 56,
                 child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-                  },
+                  onPressed: _isSigningOut ? null : _handleSignOut,
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: logoutRed.withValues(alpha: 0.3)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     foregroundColor: logoutRed,
                   ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.logout, size: 20),
-                      SizedBox(width: 8),
-                      Text('로그아웃', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
+                  child: _isSigningOut
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout, size: 20),
+                            SizedBox(width: 8),
+                            Text('로그아웃', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
                 ),
               ),
             ),

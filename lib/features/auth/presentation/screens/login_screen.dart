@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
+import 'package:three_degress_of_doubt_frontend/features/profile/presentation/screens/profile_setup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,6 +12,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _authRepository = AppDependencies.authRepository;
 
   bool _showPassword = false;
   bool _isLoading = false;
@@ -42,22 +45,85 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_canSubmit) return;
     setState(() => _isLoading = true);
 
-    await Future<void>.delayed(const Duration(seconds: 1));
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, '/main');
+    try {
+      final credential = await _authRepository.signInWithEmail(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      final user = credential.user;
+      if (user == null) {
+        throw StateError('로그인 사용자 정보를 가져오지 못했습니다.');
+      }
+      final idToken = await _authRepository.getIdToken(user);
+      if (idToken == null || idToken.isEmpty) {
+        throw StateError('인증 토큰 발급에 실패했습니다.');
+      }
+      final syncResult = await _authRepository.syncWithBackend(
+        idToken: idToken,
+      );
+      if (!mounted) return;
+      if (syncResult.isNewUser) {
+        Navigator.pushReplacementNamed(
+          context,
+          '/profile-setup',
+          arguments: ProfileSetupArgs(
+            initialNickname: syncResult.user.nickname ?? '',
+            initialProfileImageUrl: syncResult.user.profileImageUrl ?? '',
+          ),
+        );
+      } else {
+        Navigator.pushReplacementNamed(context, '/main');
+      }
+    } on Exception catch (error) {
+      if (mounted) {
+        _showError(_mapAuthError(error));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Future<void> _handleGoogleLogin() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
 
-    await Future<void>.delayed(const Duration(seconds: 1));
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, '/main');
+    try {
+      final credential = await _authRepository.signInWithGoogle();
+      final user = credential.user;
+      if (user == null) {
+        throw StateError('로그인 사용자 정보를 가져오지 못했습니다.');
+      }
+      final idToken = await _authRepository.getIdToken(user);
+      if (idToken == null || idToken.isEmpty) {
+        throw StateError('인증 토큰 발급에 실패했습니다.');
+      }
+      final syncResult = await _authRepository.syncWithBackend(
+        idToken: idToken,
+      );
+      if (!mounted) return;
+      if (syncResult.isNewUser) {
+        Navigator.pushReplacementNamed(
+          context,
+          '/profile-setup',
+          arguments: ProfileSetupArgs(
+            initialNickname: syncResult.user.nickname ?? '',
+            initialProfileImageUrl: syncResult.user.profileImageUrl ?? '',
+          ),
+        );
+      } else {
+        Navigator.pushReplacementNamed(context, '/main');
+      }
+    } on Exception catch (error) {
+      if (mounted) {
+        _showError(_mapAuthError(error));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -112,18 +178,18 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Text(
                         'AI 사기 방지 시뮬레이터',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: subtitleColor,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: subtitleColor, fontSize: 14),
                       ),
                       const SizedBox(height: 64),
                       if (_isFormVisible) _buildForm(cardColor, primaryGreen),
-                      if (!_isFormVisible) _buildSkeleton(cardColor, primaryGreen),
+                      if (!_isFormVisible)
+                        _buildSkeleton(cardColor, primaryGreen),
                       const SizedBox(height: 20),
                       Row(
                         children: const [
-                          Expanded(child: Divider(color: borderColor, height: 1)),
+                          Expanded(
+                            child: Divider(color: borderColor, height: 1),
+                          ),
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 12),
                             child: Text(
@@ -134,7 +200,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
-                          Expanded(child: Divider(color: borderColor, height: 1)),
+                          Expanded(
+                            child: Divider(color: borderColor, height: 1),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 20),
@@ -182,10 +250,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: RichText(
                   text: TextSpan(
-                    style: const TextStyle(
-                      color: subtitleColor,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: subtitleColor, fontSize: 14),
                     children: [
                       const TextSpan(text: '계정이 없으신가요? '),
                       WidgetSpan(
@@ -225,7 +290,10 @@ class _LoginScreenState extends State<LoginScreen> {
             keyboardType: TextInputType.emailAddress,
             decoration: InputDecoration(
               hintText: '이메일',
-              hintStyle: const TextStyle(color: Color(0xFF8D98A8), fontSize: 15),
+              hintStyle: const TextStyle(
+                color: Color(0xFF8D98A8),
+                fontSize: 15,
+              ),
               prefixIcon: const Icon(
                 Icons.mail_outline,
                 color: Color(0xFF8D98A8),
@@ -250,7 +318,10 @@ class _LoginScreenState extends State<LoginScreen> {
             style: const TextStyle(color: Colors.white, fontSize: 15),
             decoration: InputDecoration(
               hintText: '비밀번호',
-              hintStyle: const TextStyle(color: Color(0xFF8D98A8), fontSize: 15),
+              hintStyle: const TextStyle(
+                color: Color(0xFF8D98A8),
+                fontSize: 15,
+              ),
               prefixIcon: const Icon(
                 Icons.lock_outline,
                 color: Color(0xFF8D98A8),
@@ -293,15 +364,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF001506)),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF001506),
+                      ),
                     ),
                   )
                 : const Text(
                     '로그인',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                   ),
           ),
         ),
@@ -331,11 +401,36 @@ class _LoginScreenState extends State<LoginScreen> {
         Container(
           height: 50,
           decoration: BoxDecoration(
-            color: primaryGreen.withOpacity(0.45),
+            color: primaryGreen.withValues(alpha: 0.45),
             borderRadius: BorderRadius.circular(14),
           ),
         ),
       ],
     );
+  }
+
+  String _mapAuthError(Object error) {
+    final text = error.toString();
+    if (text.contains('wrong-password') ||
+        text.contains('user-not-found') ||
+        text.contains('invalid-credential')) {
+      return '이메일 또는 비밀번호가 일치하지 않습니다.';
+    }
+    if (text.contains('invalid-email')) {
+      return '이메일 형식을 확인해 주세요.';
+    }
+    if (text.contains('user-disabled')) {
+      return '비활성화된 계정입니다.';
+    }
+    if (text.contains('canceled')) {
+      return '로그인이 취소되었습니다.';
+    }
+    return '로그인 중 오류가 발생했습니다.';
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
