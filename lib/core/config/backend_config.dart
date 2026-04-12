@@ -1,0 +1,60 @@
+import 'package:flutter/foundation.dart';
+
+class BackendConfig {
+  BackendConfig._();
+
+  static String get baseUrl {
+    final envBaseUrl = const String.fromEnvironment(
+      'BACKEND_BASE_URL',
+      defaultValue: '',
+    );
+    if (envBaseUrl.isNotEmpty) {
+      return envBaseUrl;
+    }
+    return _defaultBaseUrl();
+  }
+
+  static String get authPath {
+    return const String.fromEnvironment(
+      'BACKEND_AUTH_PATH',
+      defaultValue: '/api/users/sync',
+    );
+  }
+
+  static String get profilePath {
+    return const String.fromEnvironment(
+      'BACKEND_PROFILE_PATH',
+      defaultValue: '/api/users/me',
+    );
+  }
+
+  static Duration get connectTimeout {
+    return Duration(seconds: _readInt('BACKEND_CONNECT_TIMEOUT_SEC', 10));
+  }
+
+  static Duration get sendTimeout {
+    return Duration(seconds: _readInt('BACKEND_SEND_TIMEOUT_SEC', 15));
+  }
+
+  static Duration get receiveTimeout {
+    return Duration(seconds: _readInt('BACKEND_RECEIVE_TIMEOUT_SEC', 15));
+  }
+
+  static int _readInt(String key, int fallback) {
+    final value = String.fromEnvironment(key, defaultValue: '');
+    final parsed = int.tryParse(value);
+    return (parsed != null && parsed > 0) ? parsed : fallback;
+  }
+
+  static String _defaultBaseUrl() {
+    if (kIsWeb) {
+      return 'http://localhost:3000';
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:3000';
+    }
+
+    return 'http://localhost:3000';
+  }
+}

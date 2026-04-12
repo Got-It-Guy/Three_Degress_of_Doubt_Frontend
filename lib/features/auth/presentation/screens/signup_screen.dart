@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -8,10 +9,10 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _authRepository = AppDependencies.authRepository;
 
   bool _showPassword = false;
   bool _showConfirmPassword = false;
@@ -30,7 +31,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -42,8 +42,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   bool get _isFormValid {
-    return _nameController.text.trim().isNotEmpty &&
-        _emailController.text.trim().isNotEmpty &&
+    return _emailController.text.trim().isNotEmpty &&
         _passwordController.text.trim().isNotEmpty &&
         _confirmPasswordController.text.trim().isNotEmpty &&
         _isPasswordMatched &&
@@ -54,11 +53,30 @@ class _SignupScreenState extends State<SignupScreen> {
     if (!_isFormValid) return;
     setState(() => _isLoading = true);
 
-    await Future<void>.delayed(const Duration(seconds: 1));
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, '/main');
+    try {
+      final credential = await _authRepository.signUpWithEmail(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      final user = credential.user;
+      if (user == null) {
+        throw StateError('회원가입 사용자 정보를 가져오지 못했습니다.');
+      }
+      await _authRepository.signOut();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('회원가입이 완료되었습니다. 로그인 후 계속 진행해 주세요.')),
+      );
+      Navigator.pushReplacementNamed(context, '/login');
+    } on Exception catch (error) {
+      if (mounted) {
+        _showError(_mapAuthError(error));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -68,7 +86,8 @@ class _SignupScreenState extends State<SignupScreen> {
     const primaryGreen = Color(0xFF00D64F);
     const subtitleColor = Color(0xFF9AA4B2);
 
-    final isPasswordError = _passwordController.text.isNotEmpty &&
+    final isPasswordError =
+        _passwordController.text.isNotEmpty &&
         _confirmPasswordController.text.isNotEmpty &&
         !_isPasswordMatched;
 
@@ -128,10 +147,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       const Text(
                         'ScamShield와 함께 사기 예방 훈련을 시작하세요',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: subtitleColor,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: subtitleColor, fontSize: 14),
                       ),
                       const SizedBox(height: 64),
                       if (_isFormVisible)
@@ -140,7 +156,8 @@ class _SignupScreenState extends State<SignupScreen> {
                           primaryGreen: primaryGreen,
                           isPasswordError: isPasswordError,
                         ),
-                      if (!_isFormVisible) _buildSkeleton(cardColor, primaryGreen),
+                      if (!_isFormVisible)
+                        _buildSkeleton(cardColor, primaryGreen),
                     ],
                   ),
                 ),
@@ -150,10 +167,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: RichText(
                   text: TextSpan(
-                    style: const TextStyle(
-                      color: subtitleColor,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: subtitleColor, fontSize: 14),
                     children: [
                       const TextSpan(text: '이미 계정이 있으신가요? '),
                       WidgetSpan(
@@ -191,34 +205,21 @@ class _SignupScreenState extends State<SignupScreen> {
         SizedBox(
           height: 50,
           child: TextField(
-            controller: _nameController,
-            onChanged: (_) => setState(() {}),
-            style: const TextStyle(color: Colors.white, fontSize: 15),
-            decoration: InputDecoration(
-              hintText: '별명',
-              hintStyle: const TextStyle(color: Color(0xFF8D98A8), fontSize: 15),
-              prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF8D98A8), size: 20),
-              filled: true,
-              fillColor: cardColor,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 50,
-          child: TextField(
             controller: _emailController,
             onChanged: (_) => setState(() {}),
             keyboardType: TextInputType.emailAddress,
             style: const TextStyle(color: Colors.white, fontSize: 15),
             decoration: InputDecoration(
               hintText: '이메일',
-              hintStyle: const TextStyle(color: Color(0xFF8D98A8), fontSize: 15),
-              prefixIcon: const Icon(Icons.mail_outline, color: Color(0xFF8D98A8), size: 20),
+              hintStyle: const TextStyle(
+                color: Color(0xFF8D98A8),
+                fontSize: 15,
+              ),
+              prefixIcon: const Icon(
+                Icons.mail_outline,
+                color: Color(0xFF8D98A8),
+                size: 20,
+              ),
               filled: true,
               fillColor: cardColor,
               border: OutlineInputBorder(
@@ -238,8 +239,15 @@ class _SignupScreenState extends State<SignupScreen> {
             style: const TextStyle(color: Colors.white, fontSize: 15),
             decoration: InputDecoration(
               hintText: '비밀번호',
-              hintStyle: const TextStyle(color: Color(0xFF8D98A8), fontSize: 15),
-              prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF8D98A8), size: 20),
+              hintStyle: const TextStyle(
+                color: Color(0xFF8D98A8),
+                fontSize: 15,
+              ),
+              prefixIcon: const Icon(
+                Icons.lock_outline,
+                color: Color(0xFF8D98A8),
+                size: 20,
+              ),
               suffixIcon: IconButton(
                 onPressed: () => setState(() => _showPassword = !_showPassword),
                 icon: Icon(
@@ -267,13 +275,23 @@ class _SignupScreenState extends State<SignupScreen> {
             style: const TextStyle(color: Colors.white, fontSize: 15),
             decoration: InputDecoration(
               hintText: '비밀번호 확인',
-              hintStyle: const TextStyle(color: Color(0xFF8D98A8), fontSize: 15),
-              prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF8D98A8), size: 20),
+              hintStyle: const TextStyle(
+                color: Color(0xFF8D98A8),
+                fontSize: 15,
+              ),
+              prefixIcon: const Icon(
+                Icons.lock_outline,
+                color: Color(0xFF8D98A8),
+                size: 20,
+              ),
               suffixIcon: IconButton(
-                onPressed: () =>
-                    setState(() => _showConfirmPassword = !_showConfirmPassword),
+                onPressed: () => setState(
+                  () => _showConfirmPassword = !_showConfirmPassword,
+                ),
                 icon: Icon(
-                  _showConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                  _showConfirmPassword
+                      ? Icons.visibility_off
+                      : Icons.visibility,
                   color: const Color(0xFF8D98A8),
                   size: 20,
                 ),
@@ -293,10 +311,7 @@ class _SignupScreenState extends State<SignupScreen> {
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: Text(
               '비밀번호가 일치하지 않습니다.',
-              style: TextStyle(
-                color: Color(0xFFFF6D6D),
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Color(0xFFFF6D6D), fontSize: 12),
             ),
           ),
         ],
@@ -320,15 +335,14 @@ class _SignupScreenState extends State<SignupScreen> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF001506)),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF001506),
+                      ),
                     ),
                   )
                 : const Text(
                     '회원가입',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                   ),
           ),
         ),
@@ -344,13 +358,11 @@ class _SignupScreenState extends State<SignupScreen> {
         _skeletonItem(cardColor),
         const SizedBox(height: 12),
         _skeletonItem(cardColor),
-        const SizedBox(height: 12),
-        _skeletonItem(cardColor),
         const SizedBox(height: 14),
         Container(
           height: 50,
           decoration: BoxDecoration(
-            color: primaryGreen.withOpacity(0.45),
+            color: primaryGreen.withValues(alpha: 0.45),
             borderRadius: BorderRadius.circular(14),
           ),
         ),
@@ -366,5 +378,24 @@ class _SignupScreenState extends State<SignupScreen> {
         borderRadius: BorderRadius.circular(14),
       ),
     );
+  }
+
+  String _mapAuthError(Object error) {
+    if (error.toString().contains('email-already-in-use')) {
+      return '이미 가입된 이메일입니다.';
+    }
+    if (error.toString().contains('weak-password')) {
+      return '비밀번호가 너무 약합니다.';
+    }
+    if (error.toString().contains('invalid-email')) {
+      return '이메일 형식을 확인해 주세요.';
+    }
+    return '회원가입 중 오류가 발생했습니다.';
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

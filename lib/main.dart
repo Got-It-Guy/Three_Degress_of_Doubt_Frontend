@@ -5,12 +5,11 @@ import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/signup_screen.dart';
 import 'features/home/presentation/screens/home_screen.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
+import 'features/profile/presentation/screens/profile_setup_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MainApp());
 }
 
@@ -44,6 +43,12 @@ class MainApp extends StatelessWidget {
         return _buildSignupRoute(const SignupScreen(), settings);
       case '/main':
         return _buildFastRoute(const HomeScreen(), settings);
+      case '/profile-setup':
+        final args = settings.arguments;
+        final safeArgs = args is ProfileSetupArgs
+            ? args
+            : const ProfileSetupArgs();
+        return _buildFastRoute(ProfileSetupScreen(args: safeArgs), settings);
       case '/profile':
         return _buildFastRoute(const ProfileScreen(), settings);
       default:
@@ -76,10 +81,14 @@ class MainApp extends StatelessWidget {
         final topScale = Tween<double>(begin: 0.96, end: 1.0).animate(primary);
         final topOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(primary);
 
-        final underScale =
-            Tween<double>(begin: 1.0, end: 0.99).animate(secondary);
-        final underOpacity =
-            Tween<double>(begin: 1.0, end: 0.96).animate(secondary);
+        final underScale = Tween<double>(
+          begin: 1.0,
+          end: 0.99,
+        ).animate(secondary);
+        final underOpacity = Tween<double>(
+          begin: 1.0,
+          end: 0.96,
+        ).animate(secondary);
 
         return ColoredBox(
           color: const Color(0xFF020911),
@@ -89,10 +98,7 @@ class MainApp extends StatelessWidget {
               scale: underScale,
               child: FadeTransition(
                 opacity: topOpacity,
-                child: ScaleTransition(
-                  scale: topScale,
-                  child: child,
-                ),
+                child: ScaleTransition(scale: topScale, child: child),
               ),
             ),
           ),
@@ -126,10 +132,14 @@ class MainApp extends StatelessWidget {
         final topScale = Tween<double>(begin: 0.92, end: 1.0).animate(primary);
         final topOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(primary);
 
-        final underScale =
-            Tween<double>(begin: 1.0, end: 0.98).animate(secondary);
-        final underOpacity =
-            Tween<double>(begin: 1.0, end: 0.92).animate(secondary);
+        final underScale = Tween<double>(
+          begin: 1.0,
+          end: 0.98,
+        ).animate(secondary);
+        final underOpacity = Tween<double>(
+          begin: 1.0,
+          end: 0.92,
+        ).animate(secondary);
 
         return ColoredBox(
           color: const Color(0xFF020911),
@@ -139,10 +149,7 @@ class MainApp extends StatelessWidget {
               scale: underScale,
               child: FadeTransition(
                 opacity: topOpacity,
-                child: ScaleTransition(
-                  scale: topScale,
-                  child: child,
-                ),
+                child: ScaleTransition(scale: topScale, child: child),
               ),
             ),
           ),
