@@ -28,6 +28,13 @@ class BackendConfig {
     );
   }
 
+  static String get stagesPath {
+    return const String.fromEnvironment(
+      'BACKEND_STAGES_PATH',
+      defaultValue: '/api/v1/stages',
+    );
+  }
+
   static Duration get connectTimeout {
     return Duration(seconds: _readInt('BACKEND_CONNECT_TIMEOUT_SEC', 10));
   }
