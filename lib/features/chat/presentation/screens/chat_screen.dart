@@ -217,8 +217,8 @@ class _ChatScreenState extends State<ChatScreen> {
                               color: isUser
                                   ? const Color(0xFF04330A)
                                   : Colors.white,
-                              fontSize: 22,
-                              height: 1.25,
+                              fontSize: 15,
+                              height: 1.35,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -229,7 +229,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               color: isUser
                                   ? const Color(0xFF0F6620)
                                   : const Color(0xFF8A98A8),
-                              fontSize: 16,
+                              fontSize: 11,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -259,7 +259,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         controller: _inputController,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
                         onSubmitted: (_) => _sendMessage(),
@@ -272,7 +272,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           hintText: '메시지를 입력하세요...',
                           hintStyle: TextStyle(
                             color: Color(0xFF6B7888),
-                            fontSize: 16,
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
