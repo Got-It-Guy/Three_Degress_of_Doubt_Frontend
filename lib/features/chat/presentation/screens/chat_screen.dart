@@ -404,7 +404,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             color: selected
                                 ? const Color(0xFF00D64F)
                                 : Colors.white,
-                            fontSize: 26,
+                            fontSize: 18,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
