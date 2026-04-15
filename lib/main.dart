@@ -4,6 +4,7 @@ import 'firebase_options.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/signup_screen.dart';
 import 'features/home/presentation/screens/home_screen.dart';
+import 'features/chat/presentation/screens/chat_screen.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/profile/presentation/screens/profile_setup_screen.dart';
 
@@ -43,6 +44,12 @@ class MainApp extends StatelessWidget {
         return _buildSignupRoute(const SignupScreen(), settings);
       case '/main':
         return _buildFastRoute(const HomeScreen(), settings);
+      case '/chat':
+        final args = settings.arguments;
+        final safeArgs = args is ChatScreenArgs
+            ? args
+            : const ChatScreenArgs(stageId: 6, stageTitle: '랜덤');
+        return _buildFastRoute(ChatScreen(args: safeArgs), settings);
       case '/profile-setup':
         final args = settings.arguments;
         final safeArgs = args is ProfileSetupArgs

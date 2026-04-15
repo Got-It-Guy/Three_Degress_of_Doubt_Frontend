@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
+import 'package:three_degress_of_doubt_frontend/features/chat/presentation/screens/chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -312,7 +313,16 @@ class _HomeScreenState extends State<HomeScreen> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {},
+        onTap: () {
+          Navigator.pushNamed(
+            context,
+            '/chat',
+            arguments: ChatScreenArgs(
+              stageId: stage.stageId,
+              stageTitle: stage.title,
+            ),
+          );
+        },
         borderRadius: BorderRadius.circular(20),
         hoverColor: Colors.white.withValues(alpha: 0.05),
         highlightColor: Colors.white.withValues(alpha: 0.1),
