@@ -25,6 +25,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final Random _random = Random();
 
   late final List<_ChatMessage> _messages;
+  late final _ScenarioIntroData _scenarioIntroData;
   bool _isTyping = false;
   int _messageIdSeed = 1000;
   Timer? _pendingReplyTimer;
@@ -33,15 +34,11 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _messages = [
-      _ChatMessage(
-        id: 'initial',
-        text: _initialMessageByStageId(widget.args.stageId),
-        isUser: false,
-        timestamp: DateTime.now(),
-      ),
-    ];
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    _messages = [];
+    _scenarioIntroData = _scenarioDataByStageId(widget.args.stageId);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showScenarioIntroModal();
+    });
   }
 
   @override
@@ -321,22 +318,175 @@ class _ChatScreenState extends State<ChatScreen> {
     return '$period $hour:$minute';
   }
 
-  String _initialMessageByStageId(int stageId) {
+  _ScenarioIntroData _scenarioDataByStageId(int stageId) {
     switch (stageId) {
       case 1:
-        return '안녕하세요, 금융감독원입니다. 고객님 명의로 대포통장이 개설되어 연락드렸습니다.';
+        return const _ScenarioIntroData(
+          title: '보이스피싱',
+          counterpartInfo: '김민수 수사관 (금융감독원 사칭)',
+          scenarioSummary: '금융기관을 사칭해 계좌가 범죄에 연루됐다고 압박하며 개인정보와 자금 이체를 유도합니다.',
+          firstAiMessage: '안녕하세요, 금융감독원입니다. 고객님 명의로 대포통장이 개설되어 연락드렸습니다.',
+        );
       case 2:
-        return '안녕하세요! 저희 투자 그룹에서 월 30% 수익을 보장하는 특별한 기회가 있습니다.';
+        return const _ScenarioIntroData(
+          title: '투자사기',
+          counterpartInfo: '박도윤 팀장 (투자리딩방 운영자)',
+          scenarioSummary:
+              '단기간 고수익을 보장한다고 접근하고, 급하게 입금을 유도한 뒤 추가 입금을 반복 요구합니다.',
+          firstAiMessage: '안녕하세요! 저희 투자 그룹에서 월 30% 수익을 보장하는 특별한 기회가 있습니다.',
+        );
       case 3:
-        return '안녕하세요. 급매 전세 매물이 나와서 안내드립니다. 오늘 안에 계약금 이체가 필요합니다.';
+        return const _ScenarioIntroData(
+          title: '부동산사기',
+          counterpartInfo: '김철수 공인중개사',
+          scenarioSummary: '실제와 다른 매물 정보로 신뢰를 만든 후 계약금 선이체를 유도해 금전 피해를 노립니다.',
+          firstAiMessage: '안녕하세요. 급매 전세 매물이 나와서 안내드립니다. 오늘 안에 계약금 이체가 필요합니다.',
+        );
       case 4:
-        return '정부지원 저금리 대출 승인 대상입니다. 선입금 수수료를 보내주시면 즉시 실행됩니다.';
+        return const _ScenarioIntroData(
+          title: '대출사기',
+          counterpartInfo: '이재훈 상담사 (정책금융기관 사칭)',
+          scenarioSummary: '저금리 대출 승인 대상이라며 접근해 보증료·수수료 명목의 선입금을 요구합니다.',
+          firstAiMessage: '정부지원 저금리 대출 승인 대상입니다. 선입금 수수료를 보내주시면 즉시 실행됩니다.',
+        );
       case 5:
-        return '안녕하세요, 올려주신 상품 보고 연락드려요. 급하게 구해서 바로 입금 가능합니다!';
+        return const _ScenarioIntroData(
+          title: '중고사기',
+          counterpartInfo: '최유진 구매자',
+          scenarioSummary: '급히 거래하겠다며 신뢰를 유도하고, 안전결제 링크나 환불 명목으로 추가 정보를 요구합니다.',
+          firstAiMessage: '안녕하세요, 올려주신 상품 보고 연락드려요. 급하게 구해서 바로 입금 가능합니다!',
+        );
       case 6:
       default:
-        return '안녕하세요, 국세청입니다. 환급금 지급을 위해 계좌 확인이 필요합니다.';
+        return const _ScenarioIntroData(
+          title: '랜덤',
+          counterpartInfo: '정우성 담당자 (기관 사칭)',
+          scenarioSummary: '공공기관을 사칭해 환급, 지원금, 조사 등을 빌미로 개인정보 입력 또는 송금을 유도합니다.',
+          firstAiMessage: '안녕하세요, 국세청입니다. 환급금 지급을 위해 계좌 확인이 필요합니다.',
+        );
     }
+  }
+
+  Future<void> _showScenarioIntroModal() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.62),
+      builder: (dialogContext) {
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF09131E),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFF1E2B3D), width: 1.1),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _scenarioIntroData.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _buildIntroSection(
+                  '상대방 정보',
+                  _scenarioIntroData.counterpartInfo,
+                ),
+                const SizedBox(height: 10),
+                _buildIntroSection(
+                  '시나리오 설명',
+                  _scenarioIntroData.scenarioSummary,
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      _appendFirstAiMessage();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0B7A33),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    child: const Text('확인'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildIntroSection(String label, String value) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A121D),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2A3647), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFFA6B1BD),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _appendFirstAiMessage() {
+    if (!mounted || _messages.isNotEmpty) {
+      return;
+    }
+
+    setState(() {
+      _messages.add(
+        _ChatMessage(
+          id: 'initial',
+          text: _scenarioIntroData.firstAiMessage,
+          isUser: false,
+          timestamp: DateTime.now(),
+        ),
+      );
+    });
+    _scrollToBottom();
   }
 
   String _randomReply() {
@@ -601,3 +751,17 @@ class _ChatMessage {
 }
 
 enum _JudgmentType { scam, unknown }
+
+class _ScenarioIntroData {
+  const _ScenarioIntroData({
+    required this.title,
+    required this.counterpartInfo,
+    required this.scenarioSummary,
+    required this.firstAiMessage,
+  });
+
+  final String title;
+  final String counterpartInfo;
+  final String scenarioSummary;
+  final String firstAiMessage;
+}
