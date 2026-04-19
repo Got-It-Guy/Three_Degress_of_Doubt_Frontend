@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
-import 'package:three_degress_of_doubt_frontend/features/profile/presentation/screens/profile_setup_screen.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _authRepository = AppDependencies.authRepository;
 
   bool _showPassword = false;
+  bool _showConfirmPassword = false;
   bool _isLoading = false;
   bool _isFormVisible = false;
 
@@ -32,89 +33,41 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  bool get _canSubmit {
+  bool get _isPasswordMatched {
+    return _passwordController.text == _confirmPasswordController.text;
+  }
+
+  bool get _isFormValid {
     return _emailController.text.trim().isNotEmpty &&
         _passwordController.text.trim().isNotEmpty &&
+        _confirmPasswordController.text.trim().isNotEmpty &&
+        _isPasswordMatched &&
         !_isLoading;
   }
 
-  Future<void> _handleEmailLogin() async {
-    if (!_canSubmit) return;
+  Future<void> _handleSignup() async {
+    if (!_isFormValid) return;
     setState(() => _isLoading = true);
 
     try {
-      final credential = await _authRepository.signInWithEmail(
+      final credential = await _authRepository.signUpWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
       final user = credential.user;
       if (user == null) {
-        throw StateError('로그인 사용자 정보를 가져오지 못했습니다.');
+        throw StateError('회원가입 사용자 정보를 가져오지 못했습니다.');
       }
-      final idToken = await _authRepository.getIdToken(user);
-      if (idToken == null || idToken.isEmpty) {
-        throw StateError('인증 토큰 발급에 실패했습니다.');
-      }
-      final syncResult = await _authRepository.syncWithBackend(
-        idToken: idToken,
-      );
+      await _authRepository.signOut();
       if (!mounted) return;
-      if (syncResult.isNewUser) {
-        Navigator.pushReplacementNamed(
-          context,
-          '/profile-setup',
-          arguments: ProfileSetupArgs(
-            initialNickname: syncResult.user.nickname ?? '',
-            initialProfileImageUrl: syncResult.user.profileImageUrl ?? '',
-          ),
-        );
-      } else {
-        Navigator.pushReplacementNamed(context, '/main');
-      }
-    } on Exception catch (error) {
-      if (mounted) {
-        _showError(_mapAuthError(error));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _handleGoogleLogin() async {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
-
-    try {
-      final credential = await _authRepository.signInWithGoogle();
-      final user = credential.user;
-      if (user == null) {
-        throw StateError('로그인 사용자 정보를 가져오지 못했습니다.');
-      }
-      final idToken = await _authRepository.getIdToken(user);
-      if (idToken == null || idToken.isEmpty) {
-        throw StateError('인증 토큰 발급에 실패했습니다.');
-      }
-      final syncResult = await _authRepository.syncWithBackend(
-        idToken: idToken,
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('회원가입이 완료되었습니다. 로그인 후 계속 진행해 주세요.')),
       );
-      if (!mounted) return;
-      if (syncResult.isNewUser) {
-        Navigator.pushReplacementNamed(
-          context,
-          '/profile-setup',
-          arguments: ProfileSetupArgs(
-            initialNickname: syncResult.user.nickname ?? '',
-            initialProfileImageUrl: syncResult.user.profileImageUrl ?? '',
-          ),
-        );
-      } else {
-        Navigator.pushReplacementNamed(context, '/main');
-      }
+      Navigator.pushReplacementNamed(context, '/login');
     } on Exception catch (error) {
       if (mounted) {
         _showError(_mapAuthError(error));
@@ -132,7 +85,11 @@ class _LoginScreenState extends State<LoginScreen> {
     const cardColor = Color(0xFF111A24);
     const primaryGreen = Color(0xFF00D64F);
     const subtitleColor = Color(0xFF9AA4B2);
-    const borderColor = Color(0xFF223042);
+
+    final isPasswordError =
+        _passwordController.text.isNotEmpty &&
+        _confirmPasswordController.text.isNotEmpty &&
+        !_isPasswordMatched;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -142,12 +99,24 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Column(
             children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back, size: 18),
+                  label: const Text('돌아가기'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: subtitleColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                  ),
+                ),
+              ),
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: 64),
+                      const SizedBox(height: 14),
                       Center(
                         child: Container(
                           width: 72,
@@ -165,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 20),
                       const Text(
-                        'ScamShield',
+                        '회원가입',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white,
@@ -176,71 +145,19 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'AI 사기 방지 시뮬레이터',
+                        'ScamShield와 함께 사기 예방 훈련을 시작하세요',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: subtitleColor, fontSize: 14),
                       ),
                       const SizedBox(height: 64),
-                      if (_isFormVisible) _buildForm(cardColor, primaryGreen),
+                      if (_isFormVisible)
+                        _buildForm(
+                          cardColor: cardColor,
+                          primaryGreen: primaryGreen,
+                          isPasswordError: isPasswordError,
+                        ),
                       if (!_isFormVisible)
                         _buildSkeleton(cardColor, primaryGreen),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: const [
-                          Expanded(
-                            child: Divider(color: borderColor, height: 1),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              '또는',
-                              style: TextStyle(
-                                color: subtitleColor,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: Divider(color: borderColor, height: 1),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        height: 50,
-                        child: OutlinedButton(
-                          onPressed: _isLoading ? null : _handleGoogleLogin,
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: cardColor,
-                            side: const BorderSide(color: borderColor),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Text(
-                                'G',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              SizedBox(width: 10),
-                              Text(
-                                'Google로 계속하기',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -252,12 +169,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   text: TextSpan(
                     style: const TextStyle(color: subtitleColor, fontSize: 14),
                     children: [
-                      const TextSpan(text: '계정이 없으신가요? '),
+                      const TextSpan(text: '이미 계정이 있으신가요? '),
                       WidgetSpan(
                         child: GestureDetector(
-                          onTap: () => Navigator.pushNamed(context, '/signup'),
+                          onTap: () => Navigator.pop(context),
                           child: const Text(
-                            '회원가입',
+                            '로그인',
                             style: TextStyle(
                               color: primaryGreen,
                               fontSize: 14,
@@ -277,7 +194,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildForm(Color cardColor, Color primaryGreen) {
+  Widget _buildForm({
+    required Color cardColor,
+    required Color primaryGreen,
+    required bool isPasswordError,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -286,8 +207,8 @@ class _LoginScreenState extends State<LoginScreen> {
           child: TextField(
             controller: _emailController,
             onChanged: (_) => setState(() {}),
-            style: const TextStyle(color: Colors.white, fontSize: 15),
             keyboardType: TextInputType.emailAddress,
+            style: const TextStyle(color: Colors.white, fontSize: 15),
             decoration: InputDecoration(
               hintText: '이메일',
               hintStyle: const TextStyle(
@@ -308,7 +229,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         SizedBox(
           height: 50,
           child: TextField(
@@ -344,11 +265,61 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 50,
+          child: TextField(
+            controller: _confirmPasswordController,
+            onChanged: (_) => setState(() {}),
+            obscureText: !_showConfirmPassword,
+            style: const TextStyle(color: Colors.white, fontSize: 15),
+            decoration: InputDecoration(
+              hintText: '비밀번호 확인',
+              hintStyle: const TextStyle(
+                color: Color(0xFF8D98A8),
+                fontSize: 15,
+              ),
+              prefixIcon: const Icon(
+                Icons.lock_outline,
+                color: Color(0xFF8D98A8),
+                size: 20,
+              ),
+              suffixIcon: IconButton(
+                onPressed: () => setState(
+                  () => _showConfirmPassword = !_showConfirmPassword,
+                ),
+                icon: Icon(
+                  _showConfirmPassword
+                      ? Icons.visibility_off
+                      : Icons.visibility,
+                  color: const Color(0xFF8D98A8),
+                  size: 20,
+                ),
+              ),
+              filled: true,
+              fillColor: cardColor,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
+        if (isPasswordError) ...[
+          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              '비밀번호가 일치하지 않습니다.',
+              style: TextStyle(color: Color(0xFFFF6D6D), fontSize: 12),
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
         SizedBox(
           height: 50,
           child: ElevatedButton(
-            onPressed: _canSubmit ? _handleEmailLogin : null,
+            onPressed: _isFormValid ? _handleSignup : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryGreen,
               foregroundColor: const Color(0xFF001506),
@@ -370,7 +341,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   )
                 : const Text(
-                    '로그인',
+                    '회원가입',
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                   ),
           ),
@@ -382,22 +353,12 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildSkeleton(Color cardColor, Color primaryGreen) {
     return Column(
       children: [
-        Container(
-          height: 50,
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
+        _skeletonItem(cardColor),
+        const SizedBox(height: 12),
+        _skeletonItem(cardColor),
+        const SizedBox(height: 12),
+        _skeletonItem(cardColor),
         const SizedBox(height: 14),
-        Container(
-          height: 50,
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-        const SizedBox(height: 16),
         Container(
           height: 50,
           decoration: BoxDecoration(
@@ -409,23 +370,27 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Widget _skeletonItem(Color color) {
+    return Container(
+      height: 50,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(14),
+      ),
+    );
+  }
+
   String _mapAuthError(Object error) {
-    final text = error.toString();
-    if (text.contains('wrong-password') ||
-        text.contains('user-not-found') ||
-        text.contains('invalid-credential')) {
-      return '이메일 또는 비밀번호가 일치하지 않습니다.';
+    if (error.toString().contains('email-already-in-use')) {
+      return '이미 가입된 이메일입니다.';
     }
-    if (text.contains('invalid-email')) {
+    if (error.toString().contains('weak-password')) {
+      return '비밀번호가 너무 약합니다.';
+    }
+    if (error.toString().contains('invalid-email')) {
       return '이메일 형식을 확인해 주세요.';
     }
-    if (text.contains('user-disabled')) {
-      return '비활성화된 계정입니다.';
-    }
-    if (text.contains('canceled')) {
-      return '로그인이 취소되었습니다.';
-    }
-    return '로그인 중 오류가 발생했습니다.';
+    return '회원가입 중 오류가 발생했습니다.';
   }
 
   void _showError(String message) {

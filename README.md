@@ -1,21 +1,22 @@
 # Three Degrees of Doubt Frontend
 
-사기 예방 시뮬레이터(Flutter) 프론트엔드 프로젝트입니다.  
-현재는 로그인 UI와 기본 라우팅 흐름, 홈/프로필의 `준비중` 화면까지 구현된 상태입니다.
+사기 예방 시뮬레이터(Flutter) 프론트엔드 프로젝트입니다.
 
 ## 현재 구현 범위
-- 다크 테마 기반 로그인 화면 (`ScamShield`)
-- 이메일/비밀번호 입력, 비밀번호 표시 토글
-- 로그인 버튼 활성화 조건(이메일/비밀번호 입력 여부)
-- 이메일 로그인/Google 로그인 Mock 처리
-- 로그인 성공 시 홈 화면(`/main`) 이동
-- 홈 화면에서 프로필 화면(`/profile`) 이동
-- 홈/프로필 화면 `준비중입니다` UI
+- Firebase 이메일 로그인/회원가입
+- Google 로그인(Firebase Credential 연동)
+- Firebase ID 토큰 기반 백엔드 동기화(`/api/users/sync`)
+- 신규 유저 분기: `/profile-setup` 진입
+- 초기 프로필 설정(닉네임 + 갤러리 이미지 선택)
+- 프로필 저장 API 호출(`/api/users/me`)
+- 로그아웃 시 Firebase `signOut()` 실제 호출
 
 ## 라우트
-- `/login`: 로그인 화면
-- `/main`: 홈 화면(준비중)
-- `/profile`: 프로필 화면(준비중)
+- `/login`: 로그인
+- `/signup`: 회원가입
+- `/profile-setup`: 신규 사용자 초기 프로필 설정
+- `/main`: 홈
+- `/profile`: 프로필
 
 ## 프로젝트 구조
 ```text
@@ -23,6 +24,10 @@ three_degress_of_doubt_frontend
 ├─ lib
 │  ├─ app
 │  ├─ core
+│  │  ├─ config
+│  │  │  └─ backend_config.dart
+│  │  ├─ di
+│  │  │  └─ app_dependencies.dart
 │  │  ├─ theme
 │  │  ├─ utils
 │  │  └─ widgets
@@ -30,9 +35,11 @@ three_degress_of_doubt_frontend
 │  │  ├─ auth
 │  │  │  ├─ application
 │  │  │  ├─ data
+│  │  │  │  └─ auth_repository.dart
 │  │  │  └─ presentation
 │  │  │     └─ screens
-│  │  │        └─ login_screen.dart
+│  │  │        ├─ login_screen.dart
+│  │  │        └─ signup_screen.dart
 │  │  ├─ home
 │  │  │  ├─ data
 │  │  │  ├─ domain
@@ -45,35 +52,36 @@ three_degress_of_doubt_frontend
 │  │  │  ├─ domain
 │  │  │  └─ presentation
 │  │  │     └─ screens
-│  │  │        └─ profile_screen.dart
+│  │  │        ├─ profile_screen.dart
+│  │  │        └─ profile_setup_screen.dart
 │  │  └─ chat
 │  │     ├─ data
 │  │     ├─ domain
 │  │     └─ presentation
 │  │        ├─ screens
 │  │        └─ widgets
+│  ├─ firebase_options.dart
 │  └─ main.dart
+├─ docs
+│  ├─ BACKEND_CONTRACT.md
+│  └─ FIREBASE_AUTH_ROADMAP.md
+├─ test
+│  └─ smoke_test.dart
 ├─ pubspec.yaml
 └─ README.md
 ```
 
-## 실행 방법
-1. Flutter SDK 설치 확인
-2. 의존성 설치
+## Android 실행
+1. 의존성 설치
 ```bash
 flutter pub get
 ```
+2. 안드로이드 에뮬레이터/디바이스 실행
 3. 앱 실행
 ```bash
 flutter run
 ```
 
-## 현재 동작 시나리오
-1. 앱 시작 시 `/login` 진입
-2. 이메일/비밀번호 입력 후 `로그인` 클릭
-3. 1초 로딩 후 `/main` 이동
-4. 홈에서 프로필 아이콘 또는 `프로필로 이동` 버튼 클릭 시 `/profile` 이동
 
-## 참고
-- 현재 로그인/Google 로그인은 API 연동 전 임시 Mock 동작입니다.
-- `회원가입`, 실제 인증, 채팅/스테이지 기능은 이후 구현 예정입니다.
+## 문서
+- `docs/BACKEND_CONTRACT.md`: 백엔드 요청/응답 계약, 목서버 호환 필드, Android 실행 예시
