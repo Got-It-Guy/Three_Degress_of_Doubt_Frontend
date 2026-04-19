@@ -36,9 +36,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final progressByStageId = await AppDependencies.stageRepository
           .fetchStageProgresses(idToken: idToken);
-      if (!mounted) {
-        return;
-      }
+          
+      if (!mounted) return;
 
       setState(() {
         _stages = _baseStages().map((stage) {
@@ -54,9 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoadingProgress = false;
       });
     } on Exception catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       setState(() {
         _progressError = error.toString();
@@ -67,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint("### 홈 화면 빌드 시작됨! ###");
     const bgColor = Color(0xFF020911);
     const cardColor = Color(0xFF111A24);
     const primaryGreen = Color(0xFF00D64F);
@@ -195,8 +193,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   const bottomPadding = 32.0;
                   final itemWidth =
                       (availableWidth - (horizontalPadding * 2) - spacing) / 2;
-                  final itemHeight =
+                  double itemHeight =
                       (availableHeight - bottomPadding - (spacing * 2)) / 3;
+
+                  if (itemHeight <= 0) itemHeight = 1.0;
+
                   final dynamicAspectRatio = itemWidth / itemHeight;
                   return Padding(
                     padding: const EdgeInsets.only(
