@@ -1,9 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:three_degress_of_doubt_frontend/core/config/backend_config.dart';
-import 'package:three_degress_of_doubt_frontend/core/config/google_auth_config.dart';
 
 class SyncedUser {
   const SyncedUser({
@@ -69,26 +66,20 @@ class AuthSyncResult {
 }
 
 class AuthRepository {
-  AuthRepository({
-    FirebaseAuth? firebaseAuth,
-    GoogleSignIn? googleSignIn,
-    Dio? dio,
-  }) : _auth = firebaseAuth ?? FirebaseAuth.instance,
-       _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
-       _dio =
-           dio ??
-           Dio(
-             BaseOptions(
-               connectTimeout: BackendConfig.connectTimeout,
-               sendTimeout: BackendConfig.sendTimeout,
-               receiveTimeout: BackendConfig.receiveTimeout,
-             ),
-           );
+  AuthRepository({FirebaseAuth? firebaseAuth, Dio? dio})
+    : _auth = firebaseAuth ?? FirebaseAuth.instance,
+      _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              connectTimeout: BackendConfig.connectTimeout,
+              sendTimeout: BackendConfig.sendTimeout,
+              receiveTimeout: BackendConfig.receiveTimeout,
+            ),
+          );
 
   final FirebaseAuth _auth;
-  final GoogleSignIn _googleSignIn;
   final Dio _dio;
-  Future<void>? _googleInitFuture;
 
   Future<UserCredential> signInWithEmail({
     required String email,
@@ -108,34 +99,12 @@ class AuthRepository {
   }
 
   Future<UserCredential> signInWithGoogle() async {
-    await _ensureGoogleInitialized();
-
-    if (!_googleSignIn.supportsAuthenticate()) {
-      throw StateError(
-        'Google authentication is not supported on this platform',
-      );
-    }
-
-    await _clearGoogleSessionBestEffort();
-
-    final googleUser = await _googleSignIn.authenticate();
-    final googleAuth = googleUser.authentication;
-    final credential = GoogleAuthProvider.credential(
-      idToken: googleAuth.idToken,
-    );
-
-    return _auth.signInWithCredential(credential);
+    final provider = GoogleAuthProvider();
+    return _auth.signInWithProvider(provider);
   }
 
   Future<void> signOut() async {
     await _auth.signOut();
-    try {
-      if (_googleSignIn.supportsAuthenticate()) {
-        await _googleSignIn.signOut();
-      }
-    } catch (_) {
-      // ignore: best-effort sign out for Google provider
-    }
   }
 
   Future<String?> getIdToken(User user) {
@@ -318,46 +287,6 @@ class AuthRepository {
       final body = error.response?.data ?? error.message;
       final suffix = statusCode != null ? ' ($statusCode)' : '';
       throw StateError('Backend profile fetch failed$suffix: $body');
-    }
-  }
-
-  Future<void> _ensureGoogleInitialized() {
-    _googleInitFuture ??= _initializeGoogleSignIn();
-    return _googleInitFuture!;
-  }
-
-  Future<void> _initializeGoogleSignIn() async {
-    final serverClientId = GoogleAuthConfig.serverClientId;
-    if (kDebugMode) {
-      debugPrint(
-        '[GoogleSignIn] initialize(serverClientId: ${serverClientId ?? "null"})',
-      );
-    }
-
-    try {
-      await _googleSignIn.initialize(serverClientId: serverClientId);
-    } on GoogleSignInException catch (error) {
-      if (kDebugMode) {
-        debugPrint(
-          '[GoogleSignIn] initialize failed '
-          '(code: ${error.code}, description: ${error.description})',
-        );
-      }
-      rethrow;
-    }
-  }
-
-  Future<void> _clearGoogleSessionBestEffort() async {
-    try {
-      await _googleSignIn.signOut();
-    } catch (_) {
-      // ignore: best-effort cleanup before a fresh authenticate call
-    }
-
-    try {
-      await _googleSignIn.disconnect();
-    } catch (_) {
-      // ignore: some devices/providers may reject disconnect without a session
     }
   }
 
