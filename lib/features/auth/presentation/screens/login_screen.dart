@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 import 'package:three_degress_of_doubt_frontend/features/profile/presentation/screens/profile_setup_screen.dart';
 
@@ -410,6 +411,40 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String _mapAuthError(Object error) {
+    if (error is GoogleSignInException) {
+      final description = (error.description ?? '').trim();
+      switch (error.code) {
+        case GoogleSignInExceptionCode.canceled:
+          return description.isEmpty
+              ? 'Google 로그인 취소됨 (code: canceled)'
+              : 'Google 로그인 취소됨 (code: canceled)\n$description';
+        case GoogleSignInExceptionCode.interrupted:
+          return description.isEmpty
+              ? 'Google 로그인 중단됨 (code: interrupted)'
+              : 'Google 로그인 중단됨 (code: interrupted)\n$description';
+        case GoogleSignInExceptionCode.uiUnavailable:
+          return description.isEmpty
+              ? 'Google 로그인 UI 사용 불가 (code: uiUnavailable)'
+              : 'Google 로그인 UI 사용 불가 (code: uiUnavailable)\n$description';
+        case GoogleSignInExceptionCode.clientConfigurationError:
+          return description.isEmpty
+              ? 'Google 로그인 설정 오류 (code: clientConfigurationError)'
+              : 'Google 로그인 설정 오류 (code: clientConfigurationError)\n$description';
+        case GoogleSignInExceptionCode.providerConfigurationError:
+          return description.isEmpty
+              ? 'Google Provider 설정 오류 (code: providerConfigurationError)'
+              : 'Google Provider 설정 오류 (code: providerConfigurationError)\n$description';
+        case GoogleSignInExceptionCode.userMismatch:
+          return description.isEmpty
+              ? 'Google 계정 불일치 (code: userMismatch)'
+              : 'Google 계정 불일치 (code: userMismatch)\n$description';
+        case GoogleSignInExceptionCode.unknownError:
+          return description.isEmpty
+              ? 'Google 로그인 알 수 없는 오류 (code: unknownError)'
+              : 'Google 로그인 알 수 없는 오류 (code: unknownError)\n$description';
+      }
+    }
+
     final text = error.toString();
     if (text.contains('wrong-password') ||
         text.contains('user-not-found') ||
