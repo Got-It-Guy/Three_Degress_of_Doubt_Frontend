@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "303919331446-ks32oikddj7u7l39k7r17749ms03sol8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.threedegreesofdoubt.frontend",
+            "certificate_hash": "908a4784c94a210995ad469d57362a44957fc268"
+          }
+        },
+        {
           "client_id": "303919331446-t622rvasecqi1or50ct0k91mcrpm2vtk.apps.googleusercontent.com",
           "client_type": 3
         }
