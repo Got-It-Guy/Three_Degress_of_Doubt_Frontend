@@ -116,6 +116,8 @@ class AuthRepository {
       );
     }
 
+    await _clearGoogleSessionBestEffort();
+
     final googleUser = await _googleSignIn.authenticate();
     final googleAuth = googleUser.authentication;
     final credential = GoogleAuthProvider.credential(
@@ -342,6 +344,20 @@ class AuthRepository {
         );
       }
       rethrow;
+    }
+  }
+
+  Future<void> _clearGoogleSessionBestEffort() async {
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {
+      // ignore: best-effort cleanup before a fresh authenticate call
+    }
+
+    try {
+      await _googleSignIn.disconnect();
+    } catch (_) {
+      // ignore: some devices/providers may reject disconnect without a session
     }
   }
 
