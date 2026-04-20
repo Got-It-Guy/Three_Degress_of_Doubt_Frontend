@@ -5,7 +5,7 @@ class GoogleAuthConfig {
     final value = const String.fromEnvironment(
       'GOOGLE_SERVER_CLIENT_ID',
       defaultValue:
-          '303919331446-t622rvasecqi1or50ct0k91mcrpm2vtk.apps.googleusercontent.com',
+          '303919331446-5jc784n8k4p6bcri6a0tqf4ofr9ejul0.apps.googleusercontent.com',
     ).trim();
     return value.isEmpty ? null : value;
   }
