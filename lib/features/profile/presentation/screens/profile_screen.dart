@@ -37,31 +37,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
-        throw StateError('로그인 정보가 없습니다. 다시 로그인해 주세요.');
+        throw Exception("로그인 정보가 없습니다."); 
       }
 
       final idToken = await currentUser.getIdToken();
       if (idToken == null || idToken.isEmpty) {
-        throw StateError('인증 토큰 발급에 실패했습니다.');
+        throw Exception("인증 토큰을 가져오지 못했습니다.");
       }
 
       final profile = await _authRepository.fetchMyProfile(idToken: idToken);
+      
       if (!mounted) return;
-      setState(() => _profile = profile);
+      setState(() {
+        _profile = profile;
+        _profileErrorMessage = null;
+      });
+      
     } on Exception catch (error) {
       if (!mounted) return;
-      setState(() => _profileErrorMessage = _mapProfileError(error));
+      setState(() {
+        _profileErrorMessage = _mapProfileError(error);
+      });
     } finally {
       if (mounted) {
-        setState(() => _isLoadingProfile = false);
+        setState(() {
+          _isLoadingProfile = false;
+        });
       }
     }
   }
 
   Future<void> _handleSignOut() async {
-    if (_isSigningOut) {
-      return;
-    }
+    if (_isSigningOut) return;
 
     setState(() => _isSigningOut = true);
     try {
@@ -70,9 +77,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     } on Exception {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('로그아웃 중 오류가 발생했습니다.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('로그아웃 중 오류가 발생했습니다.')),
+      );
     } finally {
       if (mounted) {
         setState(() => _isSigningOut = false);
@@ -82,25 +89,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   String get _displayNickname {
     final nickname = _profile?.nickname?.trim();
-    if (nickname != null && nickname.isNotEmpty) {
-      return nickname;
-    }
+    if (nickname != null && nickname.isNotEmpty) return nickname;
+    
     final displayName = FirebaseAuth.instance.currentUser?.displayName?.trim();
-    if (displayName != null && displayName.isNotEmpty) {
-      return displayName;
-    }
+    if (displayName != null && displayName.isNotEmpty) return displayName;
+    
     return '닉네임 미설정';
   }
 
   String get _displayEmail {
     final email = _profile?.email?.trim();
-    if (email != null && email.isNotEmpty) {
-      return email;
-    }
+    if (email != null && email.isNotEmpty) return email;
+    
     final authEmail = FirebaseAuth.instance.currentUser?.email?.trim();
-    if (authEmail != null && authEmail.isNotEmpty) {
-      return authEmail;
-    }
+    if (authEmail != null && authEmail.isNotEmpty) return authEmail;
+    
     return '이메일 정보 없음';
   }
 
@@ -116,17 +119,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Uint8List? _decodeDataUrl(String? value) {
-    if (value == null || !value.startsWith('data:')) {
-      return null;
-    }
+    if (value == null || !value.startsWith('data:')) return null;
     final commaIndex = value.indexOf(',');
-    if (commaIndex < 0) {
-      return null;
-    }
+    if (commaIndex < 0) return null;
+    
     final metadata = value.substring(0, commaIndex).toLowerCase();
-    if (!metadata.contains(';base64')) {
-      return null;
-    }
+    if (!metadata.contains(';base64')) return null;
+    
     final raw = value.substring(commaIndex + 1);
     try {
       return base64Decode(raw);
@@ -147,18 +146,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       content = Image.memory(
         imageBytes,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) {
-          return const Icon(Icons.person, size: 48, color: Color(0xFF00D64F));
-        },
+        errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 48, color: Color(0xFF00D64F)),
       );
-    } else if (imageSource != null &&
-        (imageSource.startsWith('http://') || imageSource.startsWith('https://'))) {
+    } else if (imageSource != null && (imageSource.startsWith('http://') || imageSource.startsWith('https://'))) {
       content = Image.network(
         imageSource,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) {
-          return const Icon(Icons.person, size: 48, color: Color(0xFF00D64F));
-        },
+        errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 48, color: Color(0xFF00D64F)),
       );
     } else {
       content = const Icon(Icons.person, size: 48, color: Color(0xFF00D64F));
@@ -168,7 +162,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       width: 96,
       height: 96,
       decoration: BoxDecoration(
-        color: primaryGreen.withValues(alpha: 0.1),
+        color: primaryGreen.withValues(alpha:0.1),
         shape: BoxShape.circle,
         border: Border.all(color: borderColor),
       ),
@@ -251,10 +245,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             const SizedBox(height: 8),
                             Text(
                               _profileErrorMessage!,
-                              style: const TextStyle(
-                                color: Color(0xFFFF6D6D),
-                                fontSize: 12,
-                              ),
+                              style: const TextStyle(color: Color(0xFFFF6D6D), fontSize: 12),
                             ),
                             const SizedBox(height: 4),
                             TextButton(
@@ -270,7 +261,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              _buildBadge('Lv. 5', primaryGreen.withValues(alpha: 0.2), primaryGreen),
+                              _buildBadge('Lv. 5', primaryGreen.withValues(alpha:0.2), primaryGreen),
                               const SizedBox(width: 8),
                               _buildBadge('초급 수호자', borderColor, subtitleColor),
                             ],
@@ -327,16 +318,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: OutlinedButton(
                   onPressed: _isSigningOut ? null : _handleSignOut,
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: logoutRed.withValues(alpha: 0.3)),
+                    side: BorderSide(color: logoutRed.withValues(alpha:0.3)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     foregroundColor: logoutRed,
                   ),
                   child: _isSigningOut
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -357,14 +344,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildBadge(String label, Color bgColor, Color textColor) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.bold),
-      ),
+      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(20)),
+      child: Text(label, style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -373,10 +354,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1C2835),
-            borderRadius: BorderRadius.circular(12),
-          ),
+          decoration: BoxDecoration(color: const Color(0xFF1C2835), borderRadius: BorderRadius.circular(12)),
           child: Icon(icon, color: primaryGreen, size: 20),
         ),
         const SizedBox(height: 8),
@@ -394,19 +372,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         onTap: () {},
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          decoration: BoxDecoration(
-            border: hasDivider ? Border(bottom: BorderSide(color: borderColor)) : null,
-          ),
+          decoration: BoxDecoration(border: hasDivider ? Border(bottom: BorderSide(color: borderColor)) : null),
           child: Row(
             children: [
               Icon(icon, color: subtitleColor, size: 22),
               const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                ),
-              ),
+              Expanded(child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500))),
               Icon(Icons.chevron_right, color: subtitleColor, size: 22),
             ],
           ),

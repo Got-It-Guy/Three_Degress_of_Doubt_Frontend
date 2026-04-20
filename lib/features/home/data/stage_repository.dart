@@ -4,11 +4,17 @@ import 'package:three_degress_of_doubt_frontend/core/config/backend_config.dart'
 class StageProgress {
   const StageProgress({
     required this.stageId,
+    required this.title,        
+    required this.description,  
+    this.thumbnailUrl,          
     required this.stageScore,
     required this.isCleared,
   });
 
   final int stageId;
+  final String title;
+  final String description;
+  final String? thumbnailUrl;
   final int stageScore;
   final bool isCleared;
 }
@@ -79,10 +85,13 @@ class StageRepository {
         }
 
         result[stageId] = StageProgress(
-          stageId: stageId,
-          stageScore: _toInt(item['stage_score']) ?? 0,
-          isCleared: _toBool(item['is_cleared']) ?? false,
-        );
+        stageId: stageId,
+        title: item['title']?.toString() ?? '제목 없음', 
+        description: item['description']?.toString() ?? '', 
+        thumbnailUrl: item['thumbnail_url']?.toString(), 
+        stageScore: _toInt(item['stage_score']) ?? 0,
+        isCleared: _toBool(item['is_cleared']) ?? false,
+      );
       }
 
       return result;
