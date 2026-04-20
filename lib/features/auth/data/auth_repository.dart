@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:three_degress_of_doubt_frontend/core/config/backend_config.dart';
 import 'package:three_degress_of_doubt_frontend/core/config/google_auth_config.dart';
@@ -319,10 +320,29 @@ class AuthRepository {
   }
 
   Future<void> _ensureGoogleInitialized() {
-    _googleInitFuture ??= _googleSignIn.initialize(
-      serverClientId: GoogleAuthConfig.serverClientId,
-    );
+    _googleInitFuture ??= _initializeGoogleSignIn();
     return _googleInitFuture!;
+  }
+
+  Future<void> _initializeGoogleSignIn() async {
+    final serverClientId = GoogleAuthConfig.serverClientId;
+    if (kDebugMode) {
+      debugPrint(
+        '[GoogleSignIn] initialize(serverClientId: ${serverClientId ?? "null"})',
+      );
+    }
+
+    try {
+      await _googleSignIn.initialize(serverClientId: serverClientId);
+    } on GoogleSignInException catch (error) {
+      if (kDebugMode) {
+        debugPrint(
+          '[GoogleSignIn] initialize failed '
+          '(code: ${error.code}, description: ${error.description})',
+        );
+      }
+      rethrow;
+    }
   }
 
   String _joinUrl(String baseUrl, String path) {
