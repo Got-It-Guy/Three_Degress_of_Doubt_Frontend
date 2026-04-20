@@ -14,7 +14,7 @@
       },
       "oauth_client": [
         {
-          "client_id": "303919331446-mqt23sqlneaab5h1df6ivp6pjtfk4c1v.apps.googleusercontent.com",
+          "client_id": "303919331446-3381k72vpmt4th37cr5aj34o4rri70tn.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.threedegreesofdoubt.frontend",
@@ -22,8 +22,12 @@
           }
         },
         {
-          "client_id": "303919331446-t622rvasecqi1or50ct0k91mcrpm2vtk.apps.googleusercontent.com",
-          "client_type": 3
+          "client_id": "303919331446-k2ue2e1sfta1kmm2962o4gj64akr0lfb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.threedegreesofdoubt.frontend",
+            "certificate_hash": "908a4784c94a210995ad469d57362a44957fc268"
+          }
         }
       ],
       "api_key": [
@@ -35,7 +39,7 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "303919331446-t622rvasecqi1or50ct0k91mcrpm2vtk.apps.googleusercontent.com",
+              "client_id": "303919331446-5jc784n8k4p6bcri6a0tqf4ofr9ejul0.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
