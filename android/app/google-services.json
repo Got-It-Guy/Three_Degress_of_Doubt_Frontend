@@ -1,41 +1,33 @@
 {
   "project_info": {
-    "project_number": "58959146049",
-    "project_id": "three-degrees-of-doubt",
-    "storage_bucket": "three-degrees-of-doubt.firebasestorage.app"
+    "project_number": "303919331446",
+    "project_id": "fraudprevention-fcca9",
+    "storage_bucket": "fraudprevention-fcca9.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:58959146049:android:b47f7fc594b97c4b516ac0",
+        "mobilesdk_app_id": "1:303919331446:android:1c51922304f5fe4d3a8757",
         "android_client_info": {
           "package_name": "com.threedegreesofdoubt.frontend"
         }
       },
       "oauth_client": [
         {
-          "client_id": "58959146049-nr254sj7hfj4l9eumbkhubv59vmpavab.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.threedegreesofdoubt.frontend",
-            "certificate_hash": "4a2791548975812ecf1013804c40701807dc2c11"
-          }
-        },
-        {
-          "client_id": "58959146049-n6qsrl4gc5m9d7elg4aupc61mvdgv4rp.apps.googleusercontent.com",
+          "client_id": "303919331446-t622rvasecqi1or50ct0k91mcrpm2vtk.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyD3u9k8d5bqjfAazjjrejak2j5yL2AMMwc"
+          "current_key": "AIzaSyBIM5HS1GuRlNhwSdZKxWiLj9fpHw3c_q8"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "58959146049-n6qsrl4gc5m9d7elg4aupc61mvdgv4rp.apps.googleusercontent.com",
+              "client_id": "303919331446-t622rvasecqi1or50ct0k91mcrpm2vtk.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
