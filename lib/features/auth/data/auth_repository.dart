@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:three_degress_of_doubt_frontend/core/config/backend_config.dart';
+import 'package:three_degress_of_doubt_frontend/core/config/google_auth_config.dart';
 
 class SyncedUser {
   const SyncedUser({
@@ -291,12 +292,16 @@ class AuthRepository {
 
       final statusCode = response.statusCode ?? 0;
       if (statusCode < 200 || statusCode >= 300) {
-        throw StateError('Backend profile fetch failed ($statusCode): ${response.data}');
+        throw StateError(
+          'Backend profile fetch failed ($statusCode): ${response.data}',
+        );
       }
 
       final payload = _asMap(response.data);
       if (payload == null) {
-        throw StateError('Backend profile fetch response is not a valid JSON object.');
+        throw StateError(
+          'Backend profile fetch response is not a valid JSON object.',
+        );
       }
 
       final status = payload['status']?.toString();
@@ -314,7 +319,9 @@ class AuthRepository {
   }
 
   Future<void> _ensureGoogleInitialized() {
-    _googleInitFuture ??= _googleSignIn.initialize();
+    _googleInitFuture ??= _googleSignIn.initialize(
+      serverClientId: GoogleAuthConfig.serverClientId,
+    );
     return _googleInitFuture!;
   }
 
