@@ -20,16 +20,7 @@ class StageProgress {
 }
 
 class StageRepository {
-  StageRepository({Dio? dio})
-    : _dio =
-          dio ??
-          Dio(
-            BaseOptions(
-              connectTimeout: BackendConfig.connectTimeout,
-              sendTimeout: BackendConfig.sendTimeout,
-              receiveTimeout: BackendConfig.receiveTimeout,
-            ),
-          );
+  StageRepository({required Dio dio}) : _dio = dio;
 
   final Dio _dio;
 
