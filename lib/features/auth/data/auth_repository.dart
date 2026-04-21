@@ -71,18 +71,10 @@ class AuthRepository {
   AuthRepository({
     FirebaseAuth? firebaseAuth,
     GoogleSignIn? googleSignIn,
-    Dio? dio,
+    required Dio dio,
   }) : _auth = firebaseAuth ?? FirebaseAuth.instance,
        _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
-       _dio =
-           dio ??
-           Dio(
-             BaseOptions(
-               connectTimeout: BackendConfig.connectTimeout,
-               sendTimeout: BackendConfig.sendTimeout,
-               receiveTimeout: BackendConfig.receiveTimeout,
-             ),
-           );
+       _dio = dio;
 
   final FirebaseAuth _auth;
   final GoogleSignIn _googleSignIn;
