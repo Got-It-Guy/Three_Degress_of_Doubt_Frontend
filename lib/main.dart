@@ -7,6 +7,7 @@ import 'features/home/presentation/screens/home_screen.dart';
 import 'features/chat/presentation/screens/chat_screen.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/profile/presentation/screens/profile_setup_screen.dart';
+import 'features/profile/presentation/screens/metadata_setup_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +63,8 @@ class MainApp extends StatelessWidget {
         return _buildFastRoute(ProfileSetupScreen(args: safeArgs), settings);
       case '/profile':
         return _buildFastRoute(const ProfileScreen(), settings);
+      case '/metadata-setup':
+        return _buildFastRoute(const MetadataSetupScreen(), settings);
       default:
         return _buildFastRoute(const LoginScreen(), settings);
     }

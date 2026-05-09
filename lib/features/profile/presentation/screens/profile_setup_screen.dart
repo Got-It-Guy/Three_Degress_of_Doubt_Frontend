@@ -53,9 +53,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _nicknameController.text.trim().isNotEmpty && !_isLoading;
 
   Future<void> _pickImageFromGallery() async {
-    if (_isLoading) {
-      return;
-    }
+    if (_isLoading) return;
 
     try {
       final picked = await _imagePicker.pickImage(
@@ -64,29 +62,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         imageQuality: 80,
       );
 
-      if (!mounted || picked == null) {
-        return;
-      }
+      if (!mounted || picked == null) return;
       setState(() => _selectedImage = picked);
     } on Exception {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       _showError('이미지를 선택하는 중 오류가 발생했습니다.');
     }
   }
 
   String _mimeTypeFromPath(String path) {
     final lower = path.toLowerCase();
-    if (lower.endsWith('.png')) {
-      return 'image/png';
-    }
-    if (lower.endsWith('.webp')) {
-      return 'image/webp';
-    }
-    if (lower.endsWith('.gif')) {
-      return 'image/gif';
-    }
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.gif')) return 'image/gif';
     return 'image/jpeg';
   }
 
@@ -101,9 +89,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _handleSubmit() async {
-    if (!_canSubmit) {
-      return;
-    }
+    if (!_canSubmit) return;
 
     setState(() => _isLoading = true);
     try {
@@ -129,7 +115,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       );
 
       if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+
+      // [핵심 변경] 신규 유저 닉네임 설정 완료 후 메타데이터 설정 화면으로 이동
+      // pushReplacementNamed를 사용하여 이 화면을 스택에서 제거합니다.
+      Navigator.pushReplacementNamed(context, '/metadata-setup');
+
     } on Exception catch (error) {
       if (mounted) {
         _showError(_mapError(error));
@@ -300,7 +290,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           ),
                         )
                       : const Text(
-                          '저장하고 시작하기',
+                          '저장하고 다음으로',
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w600,
