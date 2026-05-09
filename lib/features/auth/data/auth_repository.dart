@@ -265,6 +265,17 @@ class AuthRepository {
     }
   }
 
+  Future<void> updateUserMetadata({
+    required String idToken,
+    required Map<String, dynamic> metadata,
+  }) async {
+    await _dio.patch(
+      BackendConfig.userMetadataPath,
+      data: metadata,
+      options: Options(headers: {'Authorization': 'Bearer $idToken'}),
+    );
+  }
+
   Future<SyncedUser> fetchMyProfile({required String idToken}) async {
     final baseUrl = BackendConfig.baseUrl;
     final profilePath = BackendConfig.profilePath;
