@@ -24,12 +24,36 @@ class SendMessageResult {
   final List<ChatMessageDto> messages;
 }
 
+class SituationPromptDto {
+  const SituationPromptDto({
+    required this.situation,
+    required this.currentStage,
+    required this.userIntent,
+  });
+
+  final String situation;
+  final String currentStage;
+  final String userIntent;
+}
+
+class CreateRoundResult {
+  const CreateRoundResult({
+    required this.roundId,
+    this.scenarioId,
+    this.situationPrompt,
+  });
+
+  final int roundId;
+  final int? scenarioId;
+  final SituationPromptDto? situationPrompt;
+}
+
 class ChatRepository {
   ChatRepository({required Dio dio}) : _dio = dio;
 
   final Dio _dio;
 
-  Future<int> createRound({
+  Future<CreateRoundResult> createRound({
     required int stageId,
     required String idToken,
   }) async {
@@ -53,11 +77,18 @@ class ChatRepository {
     if (payload == null) {
       throw StateError('Round create response is not a valid JSON object.');
     }
-    final roundId = _extractRoundId(payload);
+    final data = _asMap(payload['data']);
+    final roundId = _extractRoundId(payload, data);
     if (roundId == null) {
       throw StateError('Round create response does not contain round_id.');
     }
-    return roundId;
+    final scenarioId = _toInt(data?['scenario_id']);
+    final situationPrompt = _parseSituationPrompt(data?['situation_prompt']);
+    return CreateRoundResult(
+      roundId: roundId,
+      scenarioId: scenarioId,
+      situationPrompt: situationPrompt,
+    );
   }
 
   Future<SendMessageResult> sendMessage({
@@ -155,7 +186,14 @@ class ChatRepository {
     );
   }
 
-  int? _extractRoundId(Map<String, dynamic> payload) {
+  int? _extractRoundId(
+    Map<String, dynamic> payload,
+    Map<String, dynamic>? data,
+  ) {
+    final fromData = _toInt(data?['round_id']) ?? _toInt(data?['id']);
+    if (fromData != null) {
+      return fromData;
+    }
     final topLevel = _toInt(payload['round_id']) ?? _toInt(payload['id']);
     if (topLevel != null) {
       return topLevel;
@@ -165,6 +203,24 @@ class ChatRepository {
       return null;
     }
     return _toInt(round['round_id']) ?? _toInt(round['id']);
+  }
+
+  SituationPromptDto? _parseSituationPrompt(dynamic raw) {
+    final prompt = _asMap(raw);
+    if (prompt == null) {
+      return null;
+    }
+    final situation = prompt['situation']?.toString().trim() ?? '';
+    final currentStage = prompt['current_stage']?.toString().trim() ?? '';
+    final userIntent = prompt['user_intent']?.toString().trim() ?? '';
+    if (situation.isEmpty && currentStage.isEmpty && userIntent.isEmpty) {
+      return null;
+    }
+    return SituationPromptDto(
+      situation: situation,
+      currentStage: currentStage,
+      userIntent: userIntent,
+    );
   }
 }
 

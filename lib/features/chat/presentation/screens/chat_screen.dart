@@ -532,10 +532,11 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     try {
-      final roundId = await _chatRepository.createRound(
+      final roundResult = await _chatRepository.createRound(
         stageId: widget.args.stageId,
         idToken: token,
       );
+      final roundId = roundResult.roundId;
       final fetched = await _chatRepository.fetchMessages(
         roundId: roundId,
         idToken: token,
