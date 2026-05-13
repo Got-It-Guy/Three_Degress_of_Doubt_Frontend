@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:three_degress_of_doubt_frontend/core/config/backend_config.dart';
+import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
 import 'package:three_degress_of_doubt_frontend/core/config/google_auth_config.dart';
 
 class SyncedUser {
@@ -149,13 +150,14 @@ class AuthRepository {
     }
 
     try {
+      final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
       final response = await _dio.post<dynamic>(
         endpoint,
         data: body,
         options: Options(
           headers: <String, String>{
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer $idToken',
+            'Authorization': 'Bearer $bearerToken',
           },
           responseType: ResponseType.json,
         ),
@@ -216,13 +218,14 @@ class AuthRepository {
     }
 
     try {
+      final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
       final response = await _dio.patch<dynamic>(
         endpoint,
         data: body,
         options: Options(
           headers: <String, String>{
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer $idToken',
+            'Authorization': 'Bearer $bearerToken',
           },
           responseType: ResponseType.json,
         ),
@@ -271,12 +274,13 @@ class AuthRepository {
     final endpoint = _joinUrl(baseUrl, profilePath);
 
     try {
+      final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
       final response = await _dio.get<dynamic>(
         endpoint,
         options: Options(
           headers: <String, String>{
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer $idToken',
+            'Authorization': 'Bearer $bearerToken',
           },
           responseType: ResponseType.json,
         ),

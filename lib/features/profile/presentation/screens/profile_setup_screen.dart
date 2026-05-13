@@ -3,8 +3,9 @@ import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
+import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 
 class ProfileSetupArgs {
   const ProfileSetupArgs({
@@ -107,14 +108,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw StateError('로그인 정보가 만료되었습니다. 다시 로그인해 주세요.');
-      }
-
-      final token = await user.getIdToken();
-      if (token == null || token.isEmpty) {
-        throw StateError('인증 토큰 발급에 실패했습니다.');
+      String token;
+      if (DevAuthConfig.enabled) {
+        token = DevAuthConfig.bearerToken;
+      } else {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          throw StateError('로그인 정보가 만료되었습니다. 다시 로그인해 주세요.');
+        }
+        final idToken = await user.getIdToken();
+        if (idToken == null || idToken.isEmpty) {
+          throw StateError('인증 토큰 발급에 실패했습니다.');
+        }
+        token = idToken;
       }
 
       String? profileImagePayload;

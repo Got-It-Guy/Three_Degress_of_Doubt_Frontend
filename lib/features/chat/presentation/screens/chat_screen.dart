@@ -1,7 +1,10 @@
-import 'dart:async';
 import 'dart:math';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
+import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
+import 'package:three_degress_of_doubt_frontend/features/chat/data/chat_repository.dart';
 
 class ChatScreenArgs {
   const ChatScreenArgs({required this.stageId, required this.stageTitle});
@@ -22,14 +25,14 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final Random _random = Random();
+  final ChatRepository _chatRepository = AppDependencies.chatRepository;
 
   late final List<_ChatMessage> _messages;
   late final _ScenarioIntroData _scenarioIntroData;
   bool _isTyping = false;
-  int _messageIdSeed = 1000;
-  Timer? _pendingReplyTimer;
   _JudgmentType? _judgmentType;
+  int? _roundId;
+  bool _isRoundInitializing = false;
 
   @override
   void initState() {
@@ -43,20 +46,29 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    _pendingReplyTimer?.cancel();
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final input = _inputController.text.trim();
-    if (input.isEmpty) {
+    if (input.isEmpty || _isRoundInitializing) {
+      return;
+    }
+    if (_roundId == null) {
+      _showSnack('라운드가 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+
+    final token = await _resolveIdToken();
+    if (token == null) {
+      _showSnack('인증 토큰을 확인할 수 없습니다.');
       return;
     }
 
     final userMessage = _ChatMessage(
-      id: 'm${_messageIdSeed++}',
+      id: 'user-${DateTime.now().microsecondsSinceEpoch}',
       text: input,
       isUser: true,
       timestamp: DateTime.now(),
@@ -68,25 +80,52 @@ class _ChatScreenState extends State<ChatScreen> {
       _isTyping = true;
     });
     _scrollToBottom();
+    try {
+      final result = await _chatRepository.sendMessage(
+        roundId: _roundId!,
+        content: input,
+        idToken: token,
+      );
 
-    _pendingReplyTimer?.cancel();
-    final delayMs = 1500 + _random.nextInt(1501);
-    _pendingReplyTimer = Timer(Duration(milliseconds: delayMs), () {
+      final fetched = await _chatRepository.fetchMessages(
+        roundId: _roundId!,
+        idToken: token,
+      );
       if (!mounted) {
         return;
       }
-      final reply = _ChatMessage(
-        id: 'm${_messageIdSeed++}',
-        text: _randomReply(),
-        isUser: false,
-        timestamp: DateTime.now(),
-      );
+      final mapped = fetched.map(_fromDto).toList();
+      if (mapped.isNotEmpty) {
+        setState(() {
+          _messages
+            ..clear()
+            ..addAll(mapped);
+          _isTyping = false;
+        });
+      } else {
+        final fallbackAi = result.messages.isNotEmpty
+            ? _fromDto(result.messages.first)
+            : _ChatMessage(
+                id: 'ai-${DateTime.now().microsecondsSinceEpoch}',
+                text: '응답을 가져오지 못했습니다.',
+                isUser: false,
+                timestamp: DateTime.now(),
+              );
+        setState(() {
+          _isTyping = false;
+          _messages.add(fallbackAi);
+        });
+      }
+      _scrollToBottom();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _isTyping = false;
-        _messages.add(reply);
       });
-      _scrollToBottom();
-    });
+      _showSnack('메시지 전송 중 오류가 발생했습니다.');
+    }
   }
 
   void _scrollToBottom() {
@@ -410,9 +449,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       Navigator.pop(dialogContext);
-                      _appendFirstAiMessage();
+                      await _initializeRoundAndMessages();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0B7A33),
@@ -471,33 +510,69 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _appendFirstAiMessage() {
-    if (!mounted || _messages.isNotEmpty) {
+  Future<void> _initializeRoundAndMessages() async {
+    if (!mounted || _isRoundInitializing) {
+      return;
+    }
+    setState(() {
+      _isRoundInitializing = true;
+      _isTyping = true;
+    });
+
+    final token = await _resolveIdToken();
+    if (token == null) {
+      if (mounted) {
+        setState(() {
+          _isRoundInitializing = false;
+          _isTyping = false;
+        });
+      }
+      _showSnack('인증 토큰을 확인할 수 없습니다.');
       return;
     }
 
-    setState(() {
-      _messages.add(
-        _ChatMessage(
-          id: 'initial',
-          text: _scenarioIntroData.firstAiMessage,
-          isUser: false,
-          timestamp: DateTime.now(),
-        ),
+    try {
+      final roundId = await _chatRepository.createRound(
+        stageId: widget.args.stageId,
+        idToken: token,
       );
-    });
-    _scrollToBottom();
-  }
-
-  String _randomReply() {
-    const responses = [
-      '네, 맞습니다. 빠른 처리를 위해 지금 바로 계좌 정보를 알려주시겠어요?',
-      '걱정하지 마세요. 도와드릴게요. 본인 확인을 위해 주민번호를 알려주세요.',
-      '지금 처리하지 않으면 법적 조치가 진행됩니다. 바로 진행하시죠.',
-      '다른 분들은 이미 큰 수익을 얻고 계십니다. 기회를 놓치지 마세요.',
-      '보안을 위해 이 번호로 전화 주시면 안전하게 처리해 드리겠습니다.',
-    ];
-    return responses[_random.nextInt(responses.length)];
+      final fetched = await _chatRepository.fetchMessages(
+        roundId: roundId,
+        idToken: token,
+      );
+      if (!mounted) {
+        return;
+      }
+      final mapped = fetched.map(_fromDto).toList();
+      setState(() {
+        _roundId = roundId;
+        _messages
+          ..clear()
+          ..addAll(mapped.isNotEmpty ? mapped : <_ChatMessage>[]);
+        if (_messages.isEmpty) {
+          _messages.add(
+            _ChatMessage(
+              id: 'initial-local',
+              text: _scenarioIntroData.firstAiMessage,
+              isUser: false,
+              timestamp: DateTime.now(),
+            ),
+          );
+        }
+        _isRoundInitializing = false;
+        _isTyping = false;
+      });
+      _scrollToBottom();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isRoundInitializing = false;
+        _isTyping = false;
+      });
+      _showSnack('라운드 초기화 중 오류가 발생했습니다.');
+    }
   }
 
   Future<void> _showJudgmentModal() async {
@@ -668,6 +743,32 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     Navigator.pop(dialogContext);
+  }
+
+  Future<String?> _resolveIdToken() async {
+    if (DevAuthConfig.enabled) {
+      return DevAuthConfig.bearerToken;
+    }
+    final user = FirebaseAuth.instance.currentUser;
+    return user?.getIdToken();
+  }
+
+  _ChatMessage _fromDto(ChatMessageDto dto) {
+    return _ChatMessage(
+      id: (dto.messageId ?? DateTime.now().microsecondsSinceEpoch).toString(),
+      text: dto.content,
+      isUser: dto.role == 'user',
+      timestamp: dto.createdAt,
+    );
+  }
+
+  void _showSnack(String text) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(text)));
   }
 }
 

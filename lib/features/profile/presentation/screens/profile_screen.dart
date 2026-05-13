@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
 import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 import 'package:three_degress_of_doubt_frontend/features/auth/data/auth_repository.dart';
 
@@ -35,14 +36,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        throw Exception("로그인 정보가 없습니다."); 
-      }
-
-      final idToken = await currentUser.getIdToken();
-      if (idToken == null || idToken.isEmpty) {
-        throw Exception("인증 토큰을 가져오지 못했습니다.");
+      String idToken;
+      if (DevAuthConfig.enabled) {
+        idToken = DevAuthConfig.bearerToken;
+      } else {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser == null) {
+          throw Exception("로그인 정보가 없습니다.");
+        }
+        final token = await currentUser.getIdToken();
+        if (token == null || token.isEmpty) {
+          throw Exception("인증 토큰을 가져오지 못했습니다.");
+        }
+        idToken = token;
       }
 
       final profile = await _authRepository.fetchMyProfile(idToken: idToken);

@@ -1,3 +1,5 @@
+import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
+
 class BackendConfig {
   BackendConfig._();
 
@@ -8,6 +10,9 @@ class BackendConfig {
     );
     if (envBaseUrl.isNotEmpty) {
       return envBaseUrl;
+    }
+    if (DevAuthConfig.enabled) {
+      return 'http://10.0.2.2:8000';
     }
     return _defaultBaseUrl();
   }
@@ -20,6 +25,12 @@ class BackendConfig {
   }
 
   static String get profilePath {
+    if (DevAuthConfig.enabled) {
+      return const String.fromEnvironment(
+        'BACKEND_PROFILE_PATH',
+        defaultValue: '/api/users/me/details',
+      );
+    }
     return const String.fromEnvironment(
       'BACKEND_PROFILE_PATH',
       defaultValue: '/api/users/me',
@@ -33,6 +44,13 @@ class BackendConfig {
     );
   }
 
+  static String roundsPathByStageId(int stageId) {
+    return '/api/v1/stages/$stageId/rounds';
+  }
+
+  static String messagesPathByRoundId(int roundId) {
+    return '/api/v1/rounds/$roundId/messages';
+  }
   static Duration get connectTimeout {
     return Duration(seconds: _readInt('BACKEND_CONNECT_TIMEOUT_SEC', 10));
   }
