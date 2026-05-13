@@ -12,7 +12,7 @@ class ChatMessageDto {
   });
 
   final int? messageId;
-  final int? roundId;
+  final String? roundId;
   final String role;
   final String content;
   final DateTime createdAt;
@@ -43,8 +43,8 @@ class CreateRoundResult {
     this.situationPrompt,
   });
 
-  final int roundId;
-  final int? scenarioId;
+  final String roundId;
+  final String? scenarioId;
   final SituationPromptDto? situationPrompt;
 }
 
@@ -98,7 +98,7 @@ class ChatRepository {
     if (roundId == null) {
       throw StateError('Round create response does not contain round_id.');
     }
-    final scenarioId = _toInt(data?['scenario_id']);
+    final scenarioId = _toIdString(data?['scenario_id']);
     final situationPrompt = _parseSituationPrompt(data?['situation_prompt']);
     return CreateRoundResult(
       roundId: roundId,
@@ -108,7 +108,7 @@ class ChatRepository {
   }
 
   Future<SendMessageResult> sendMessage({
-    required int roundId,
+    required String roundId,
     required String content,
     required String idToken,
   }) async {
@@ -146,7 +146,7 @@ class ChatRepository {
   }
 
   Future<List<ChatMessageDto>> fetchMessages({
-    required int roundId,
+    required String roundId,
     required String idToken,
   }) async {
     final endpoint = _joinUrl(
@@ -185,7 +185,7 @@ class ChatRepository {
   }
 
   Future<JudgeRoundResult> judgeRound({
-    required int roundId,
+    required String roundId,
     required bool isFraudJudged,
     required String idToken,
   }) async {
@@ -230,22 +230,24 @@ class ChatRepository {
     }
     return ChatMessageDto(
       messageId: _toInt(item['message_id']) ?? _toInt(item['id']),
-      roundId: _toInt(item['round_id']),
+      roundId: _toIdString(item['round_id']),
       role: (item['role']?.toString().trim().toLowerCase() ?? 'ai'),
       content: content,
       createdAt: _toDateTime(item['created_at']) ?? DateTime.now(),
     );
   }
 
-  int? _extractRoundId(
+  String? _extractRoundId(
     Map<String, dynamic> payload,
     Map<String, dynamic>? data,
   ) {
-    final fromData = _toInt(data?['round_id']) ?? _toInt(data?['id']);
+    final fromData =
+        _toIdString(data?['round_id']) ?? _toIdString(data?['id']);
     if (fromData != null) {
       return fromData;
     }
-    final topLevel = _toInt(payload['round_id']) ?? _toInt(payload['id']);
+    final topLevel =
+        _toIdString(payload['round_id']) ?? _toIdString(payload['id']);
     if (topLevel != null) {
       return topLevel;
     }
@@ -253,7 +255,7 @@ class ChatRepository {
     if (round == null) {
       return null;
     }
-    return _toInt(round['round_id']) ?? _toInt(round['id']);
+    return _toIdString(round['round_id']) ?? _toIdString(round['id']);
   }
 
   SituationPromptDto? _parseSituationPrompt(dynamic raw) {
@@ -307,6 +309,21 @@ int? _toInt(dynamic value) {
     return int.tryParse(value);
   }
   return null;
+}
+
+String? _toIdString(dynamic value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is String) {
+    final text = value.trim();
+    return text.isEmpty ? null : text;
+  }
+  if (value is num) {
+    return value.toString();
+  }
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
 }
 
 DateTime? _toDateTime(dynamic value) {

@@ -59,11 +59,11 @@ class BackendConfig {
     return '/api/v1/stages/$stageId/enter';
   }
 
-  static String messagesPathByRoundId(int roundId) {
+  static String messagesPathByRoundId(String roundId) {
     return '/api/v1/rounds/$roundId/messages';
   }
 
-  static String judgePathByRoundId(int roundId) {
+  static String judgePathByRoundId(String roundId) {
     return '/api/v1/rounds/$roundId/judge';
   }
   static Duration get connectTimeout {
