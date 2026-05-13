@@ -757,7 +757,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _showSnack('판정 제출 실패: $error');
         return;
       }
-      if (!mounted) return;
+      if (!mounted || !dialogContext.mounted) return;
       Navigator.pop(dialogContext);
       Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
       return;
