@@ -66,22 +66,28 @@ class BackendConfig {
   static String judgePathByRoundId(String roundId) {
     return '/api/v1/rounds/$roundId/judge';
   }
-  static Duration get connectTimeout {
-    return Duration(seconds: _readInt('BACKEND_CONNECT_TIMEOUT_SEC', 10));
+  static Duration? get connectTimeout {
+    return _readOptionalDuration('BACKEND_CONNECT_TIMEOUT_SEC');
   }
 
-  static Duration get sendTimeout {
-    return Duration(seconds: _readInt('BACKEND_SEND_TIMEOUT_SEC', 15));
+  static Duration? get sendTimeout {
+    return _readOptionalDuration('BACKEND_SEND_TIMEOUT_SEC');
   }
 
-  static Duration get receiveTimeout {
-    return Duration(seconds: _readInt('BACKEND_RECEIVE_TIMEOUT_SEC', 15));
+  static Duration? get receiveTimeout {
+    return _readOptionalDuration('BACKEND_RECEIVE_TIMEOUT_SEC');
   }
 
-  static int _readInt(String key, int fallback) {
+  static Duration? _readOptionalDuration(String key) {
     final value = String.fromEnvironment(key, defaultValue: '');
+    if (value.trim().isEmpty) {
+      return null;
+    }
     final parsed = int.tryParse(value);
-    return (parsed != null && parsed > 0) ? parsed : fallback;
+    if (parsed == null || parsed <= 0) {
+      return null;
+    }
+    return Duration(seconds: parsed);
   }
 
   static String _defaultBaseUrl() {
