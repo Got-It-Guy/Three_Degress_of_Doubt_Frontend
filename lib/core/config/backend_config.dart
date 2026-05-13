@@ -37,6 +37,13 @@ class BackendConfig {
     );
   }
 
+  static String get userMetadataPath {
+  return const String.fromEnvironment(
+    'BACKEND_METADATA_PATH',
+    defaultValue: '/api/users/me/details',
+  );
+}
+
   static String get stagesPath {
     return const String.fromEnvironment(
       'BACKEND_STAGES_PATH',

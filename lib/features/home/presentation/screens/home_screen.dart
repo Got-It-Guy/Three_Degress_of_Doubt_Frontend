@@ -70,7 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint("### 홈 화면 빌드 시작됨! ###");
     const bgColor = Color(0xFF020911);
     const cardColor = Color(0xFF111A24);
     const primaryGreen = Color(0xFF00D64F);
