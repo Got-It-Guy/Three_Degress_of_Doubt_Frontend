@@ -68,6 +68,46 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<String?> _resolveIdToken() async {
+    if (DevAuthConfig.enabled) {
+      return DevAuthConfig.bearerToken;
+    }
+    final user = FirebaseAuth.instance.currentUser;
+    return user?.getIdToken();
+  }
+
+  Future<void> _handleStageTap(_StageCardData stage) async {
+    final token = await _resolveIdToken();
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('인증 토큰을 가져오지 못했습니다.')));
+      return;
+    }
+
+    try {
+      await AppDependencies.stageRepository.enterStage(
+        stageId: stage.stageId,
+        idToken: token,
+      );
+      if (!mounted) return;
+      Navigator.pushNamed(
+        context,
+        '/chat',
+        arguments: ChatScreenArgs(
+          stageId: stage.stageId,
+          stageTitle: stage.title,
+        ),
+      );
+    } on Exception catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('스테이지 입장 실패: $error')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const bgColor = Color(0xFF020911);
@@ -319,16 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          Navigator.pushNamed(
-            context,
-            '/chat',
-            arguments: ChatScreenArgs(
-              stageId: stage.stageId,
-              stageTitle: stage.title,
-            ),
-          );
-        },
+        onTap: () => _handleStageTap(stage),
         borderRadius: BorderRadius.circular(20),
         hoverColor: Colors.white.withValues(alpha: 0.05),
         highlightColor: Colors.white.withValues(alpha: 0.1),

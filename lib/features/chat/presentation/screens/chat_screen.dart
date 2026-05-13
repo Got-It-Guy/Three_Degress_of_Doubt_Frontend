@@ -731,13 +731,33 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _confirmJudgment(BuildContext dialogContext) {
+  Future<void> _confirmJudgment(BuildContext dialogContext) async {
     final selected = _judgmentType;
     if (selected == null) {
       return;
     }
 
     if (selected == _JudgmentType.scam) {
+      if (_roundId == null) {
+        _showSnack('라운드 정보가 없습니다.');
+        return;
+      }
+      final token = await _resolveIdToken();
+      if (token == null || token.isEmpty) {
+        _showSnack('인증 토큰을 확인할 수 없습니다.');
+        return;
+      }
+      try {
+        await _chatRepository.judgeRound(
+          roundId: _roundId!,
+          isFraudJudged: true,
+          idToken: token,
+        );
+      } catch (error) {
+        _showSnack('판정 제출 실패: $error');
+        return;
+      }
+      if (!mounted) return;
       Navigator.pop(dialogContext);
       Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
       return;

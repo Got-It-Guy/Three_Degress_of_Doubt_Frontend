@@ -55,8 +55,16 @@ class BackendConfig {
     return '/api/v1/stages/$stageId/rounds';
   }
 
+  static String enterPathByStageId(int stageId) {
+    return '/api/v1/stages/$stageId/enter';
+  }
+
   static String messagesPathByRoundId(int roundId) {
     return '/api/v1/rounds/$roundId/messages';
+  }
+
+  static String judgePathByRoundId(int roundId) {
+    return '/api/v1/rounds/$roundId/judge';
   }
   static Duration get connectTimeout {
     return Duration(seconds: _readInt('BACKEND_CONNECT_TIMEOUT_SEC', 10));

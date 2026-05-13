@@ -20,6 +20,24 @@ class StageProgress {
   final bool isCleared;
 }
 
+class StageEnterResult {
+  const StageEnterResult({
+    required this.progressId,
+    required this.stageId,
+    required this.stageScore,
+    required this.warningCount,
+    required this.isCleared,
+    required this.totalRoundCount,
+  });
+
+  final String? progressId;
+  final int stageId;
+  final int stageScore;
+  final int warningCount;
+  final bool isCleared;
+  final int totalRoundCount;
+}
+
 class StageRepository {
   StageRepository({required Dio dio}) : _dio = dio;
 
@@ -93,6 +111,52 @@ class StageRepository {
       final body = error.response?.data ?? error.message;
       final suffix = statusCode != null ? ' ($statusCode)' : '';
       throw StateError('Stage fetch failed$suffix: $body');
+    }
+  }
+
+  Future<StageEnterResult> enterStage({
+    required int stageId,
+    required String idToken,
+  }) async {
+    final endpoint = _joinUrl(
+      BackendConfig.baseUrl,
+      BackendConfig.enterPathByStageId(stageId),
+    );
+
+    try {
+      final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
+      final response = await _dio.post<dynamic>(
+        endpoint,
+        data: const <String, dynamic>{},
+        options: Options(
+          headers: <String, String>{
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Bearer $bearerToken',
+          },
+          responseType: ResponseType.json,
+        ),
+      );
+
+      final payload = _asMap(response.data);
+      if (payload == null) {
+        throw StateError('Stage enter response is not a valid JSON object.');
+      }
+
+      final data = _asMap(payload['data']) ?? payload;
+      final resolvedStageId = _toInt(data['stage_id']) ?? stageId;
+      return StageEnterResult(
+        progressId: data['progress_id']?.toString(),
+        stageId: resolvedStageId,
+        stageScore: _toInt(data['stage_score']) ?? 0,
+        warningCount: _toInt(data['warning_count']) ?? 0,
+        isCleared: _toBool(data['is_cleared']) ?? false,
+        totalRoundCount: _toInt(data['total_round_count']) ?? 0,
+      );
+    } on DioException catch (error) {
+      final statusCode = error.response?.statusCode;
+      final body = error.response?.data ?? error.message;
+      final suffix = statusCode != null ? ' ($statusCode)' : '';
+      throw StateError('Stage enter failed$suffix: $body');
     }
   }
 

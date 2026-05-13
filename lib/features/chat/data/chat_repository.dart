@@ -48,6 +48,22 @@ class CreateRoundResult {
   final SituationPromptDto? situationPrompt;
 }
 
+class JudgeRoundResult {
+  const JudgeRoundResult({
+    required this.result,
+    required this.scoreDelta,
+    required this.currentScore,
+    required this.currentWarning,
+    required this.isStageCleared,
+  });
+
+  final String result;
+  final int scoreDelta;
+  final int currentScore;
+  final int currentWarning;
+  final bool isStageCleared;
+}
+
 class ChatRepository {
   ChatRepository({required Dio dio}) : _dio = dio;
 
@@ -168,6 +184,41 @@ class ChatRepository {
     return messages;
   }
 
+  Future<JudgeRoundResult> judgeRound({
+    required int roundId,
+    required bool isFraudJudged,
+    required String idToken,
+  }) async {
+    final endpoint = _joinUrl(
+      BackendConfig.baseUrl,
+      BackendConfig.judgePathByRoundId(roundId),
+    );
+    final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
+    final response = await _dio.post<dynamic>(
+      endpoint,
+      data: <String, dynamic>{'is_fraud_judged': isFraudJudged},
+      options: Options(
+        headers: <String, String>{
+          'Authorization': 'Bearer $bearerToken',
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+      ),
+    );
+
+    final payload = _asMap(response.data);
+    if (payload == null) {
+      throw StateError('Judge response is not a valid JSON object.');
+    }
+    final data = _asMap(payload['data']) ?? payload;
+    return JudgeRoundResult(
+      result: data['result']?.toString() ?? '',
+      scoreDelta: _toInt(data['score_delta']) ?? 0,
+      currentScore: _toInt(data['current_score']) ?? 0,
+      currentWarning: _toInt(data['current_warning']) ?? 0,
+      isStageCleared: _toBool(data['is_stage_cleared']) ?? false,
+    );
+  }
+
   ChatMessageDto? _parseMessage(dynamic raw) {
     final item = _asMap(raw);
     if (item == null) {
@@ -261,6 +312,28 @@ int? _toInt(dynamic value) {
 DateTime? _toDateTime(dynamic value) {
   if (value is String) {
     return DateTime.tryParse(value)?.toLocal();
+  }
+  return null;
+}
+
+bool? _toBool(dynamic value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is bool) {
+    return value;
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  if (value is String) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'true' || normalized == '1') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == '0') {
+      return false;
+    }
   }
   return null;
 }
