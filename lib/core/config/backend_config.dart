@@ -29,7 +29,7 @@ class BackendConfig {
   static String get userMetadataPath {
   return const String.fromEnvironment(
     'BACKEND_METADATA_PATH',
-    defaultValue: '/api/users/me/metadata',
+    defaultValue: '/api/users/me/details',
   );
 }
 

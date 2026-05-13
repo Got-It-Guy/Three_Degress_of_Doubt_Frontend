@@ -13,6 +13,10 @@ class SyncedUser {
     required this.nickname,
     required this.isNewUser,
     required this.profileImageUrl,
+    this.ageGroup,
+    this.job,
+    this.mainBank,
+    this.residence,
   });
 
   final int? id;
@@ -22,6 +26,11 @@ class SyncedUser {
   final String? nickname;
   final bool isNewUser;
   final String? profileImageUrl;
+  
+  final String? ageGroup;
+  final String? job;
+  final String? mainBank;
+  final String? residence;
 
   factory SyncedUser.fromJson(Map<String, dynamic> json) {
     return SyncedUser(
@@ -35,6 +44,11 @@ class SyncedUser {
           _toStringOrNull(json['profileImageUrl']) ??
           _toStringOrNull(json['profileImageDataUrl']) ??
           _toStringOrNull(json['profileImageBase64']),
+      
+      ageGroup: _toStringOrNull(json['ageGroup']) ?? _toStringOrNull(json['age_group']),
+      job: _toStringOrNull(json['job']),
+      mainBank: _toStringOrNull(json['mainBank']) ?? _toStringOrNull(json['main_bank']),
+      residence: _toStringOrNull(json['residence']),
     );
   }
 
@@ -46,6 +60,10 @@ class SyncedUser {
     String? nickname,
     bool? isNewUser,
     String? profileImageUrl,
+    String? ageGroup,
+    String? job,
+    String? mainBank,
+    String? residence,
   }) {
     return SyncedUser(
       id: id ?? this.id,
@@ -55,6 +73,10 @@ class SyncedUser {
       nickname: nickname ?? this.nickname,
       isNewUser: isNewUser ?? this.isNewUser,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      ageGroup: ageGroup ?? this.ageGroup,
+      job: job ?? this.job,
+      mainBank: mainBank ?? this.mainBank,
+      residence: residence ?? this.residence,
     );
   }
 }
@@ -266,15 +288,23 @@ class AuthRepository {
   }
 
   Future<void> updateUserMetadata({
-    required String idToken,
-    required Map<String, dynamic> metadata,
-  }) async {
-    await _dio.patch(
-      BackendConfig.userMetadataPath,
-      data: metadata,
-      options: Options(headers: {'Authorization': 'Bearer $idToken'}),
-    );
-  }
+  required String idToken,
+  required Map<String, dynamic> metadata,
+}) async {
+  final baseUrl = BackendConfig.baseUrl;
+  final metadataPath = BackendConfig.userMetadataPath;
+  final endpoint = _joinUrl(baseUrl, metadataPath);
+
+  await _dio.patch(
+    endpoint,
+    data: metadata,
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $idToken',
+      },
+    ),
+  );
+}
 
   Future<SyncedUser> fetchMyProfile({required String idToken}) async {
     final baseUrl = BackendConfig.baseUrl;
