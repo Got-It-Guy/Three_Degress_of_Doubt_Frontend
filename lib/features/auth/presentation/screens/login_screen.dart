@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
 import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 import 'package:three_degress_of_doubt_frontend/features/profile/presentation/screens/profile_setup_screen.dart';
 
@@ -22,6 +23,15 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    if (DevAuthConfig.enabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        Navigator.pushReplacementNamed(context, '/main');
+      });
+      return;
+    }
     Future<void>.delayed(const Duration(milliseconds: 120), () {
       if (mounted) {
         setState(() => _isFormVisible = true);
