@@ -20,17 +20,15 @@ class _MetadataSetupScreenState extends State<MetadataSetupScreen> {
   String? _selectedBank;
   String? _selectedResidence;
 
-  final List<String> _ageGroups =
-      List.generate(10, (i) => "${(i + 1) * 10}대");
+  final List<String> _ageGroups = [
+    "10대", "20대", "30대", "40대", "50대", "60대 이상"
+  ];
 
   final List<String> _jobs = [
     "대학생",
     "직장인",
-    "전문직",
     "자영업자",
-    "공무원",
     "주부",
-    "무직",
     "기타"
   ];
 
