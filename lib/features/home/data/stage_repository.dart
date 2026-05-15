@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:three_degress_of_doubt_frontend/core/config/backend_config.dart';
-import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
 
 class StageProgress {
   const StageProgress({
@@ -49,13 +48,12 @@ class StageRepository {
     final endpoint = _joinUrl(BackendConfig.baseUrl, BackendConfig.stagesPath);
 
     try {
-      final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
       final response = await _dio.get<dynamic>(
         endpoint,
         options: Options(
           headers: <String, String>{
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer $bearerToken',
+            'Authorization': 'Bearer $idToken',
           },
           responseType: ResponseType.json,
         ),
@@ -124,14 +122,13 @@ class StageRepository {
     );
 
     try {
-      final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
       final response = await _dio.post<dynamic>(
         endpoint,
         data: const <String, dynamic>{},
         options: Options(
           headers: <String, String>{
             'Content-Type': 'application/json; charset=utf-8',
-            'Authorization': 'Bearer $bearerToken',
+            'Authorization': 'Bearer $idToken',
           },
           responseType: ResponseType.json,
         ),

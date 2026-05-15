@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
 import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 import 'package:three_degress_of_doubt_frontend/features/chat/presentation/screens/chat_screen.dart';
 
@@ -25,19 +24,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadStageProgress() async {
     try {
-      String idToken;
-      if (DevAuthConfig.enabled) {
-        idToken = DevAuthConfig.bearerToken;
-      } else {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) {
-          throw StateError('로그인 정보가 없습니다. 다시 로그인해주세요.');
-        }
-        final token = await user.getIdToken();
-        if (token == null || token.isEmpty) {
-          throw StateError('인증 토큰을 가져오지 못했습니다.');
-        }
-        idToken = token;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw StateError('로그인 정보가 없습니다. 다시 로그인해주세요.');
+      }
+      final idToken = await user.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw StateError('인증 토큰을 가져오지 못했습니다.');
       }
 
       final progressByStageId = await AppDependencies.stageRepository
@@ -69,9 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<String?> _resolveIdToken() async {
-    if (DevAuthConfig.enabled) {
-      return DevAuthConfig.bearerToken;
-    }
     final user = FirebaseAuth.instance.currentUser;
     return user?.getIdToken();
   }
@@ -88,9 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       debugPrint('[StageFlow] sync -> enter, stage_id=${stage.stageId}');
-      if (!DevAuthConfig.enabled) {
-        await AppDependencies.authRepository.syncWithBackend(idToken: token);
-      }
+      await AppDependencies.authRepository.syncWithBackend(idToken: token);
       await AppDependencies.stageRepository.enterStage(
         stageId: stage.stageId,
         idToken: token,

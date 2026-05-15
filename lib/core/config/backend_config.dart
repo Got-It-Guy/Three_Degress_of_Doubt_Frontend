@@ -25,12 +25,6 @@ class BackendConfig {
   }
 
   static String get profilePath {
-    if (DevAuthConfig.enabled) {
-      return const String.fromEnvironment(
-        'BACKEND_PROFILE_PATH',
-        defaultValue: '/api/users/me/details',
-      );
-    }
     return const String.fromEnvironment(
       'BACKEND_PROFILE_PATH',
       defaultValue: '/api/users/me',

@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:three_degress_of_doubt_frontend/core/config/backend_config.dart';
-import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
 import 'package:three_degress_of_doubt_frontend/core/config/google_auth_config.dart';
 
 class SyncedUser {
@@ -172,14 +171,13 @@ class AuthRepository {
     }
 
     try {
-      final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
       final response = await _dio.post<dynamic>(
         endpoint,
         data: body,
         options: Options(
           headers: <String, String>{
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer $bearerToken',
+            'Authorization': 'Bearer $idToken',
           },
           responseType: ResponseType.json,
         ),
@@ -240,14 +238,13 @@ class AuthRepository {
     }
 
     try {
-      final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
       final response = await _dio.patch<dynamic>(
         endpoint,
         data: body,
         options: Options(
           headers: <String, String>{
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer $bearerToken',
+            'Authorization': 'Bearer $idToken',
           },
           responseType: ResponseType.json,
         ),
@@ -297,14 +294,12 @@ class AuthRepository {
   final baseUrl = BackendConfig.baseUrl;
   final metadataPath = BackendConfig.userMetadataPath;
   final endpoint = _joinUrl(baseUrl, metadataPath);
-  final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
-
   await _dio.patch(
     endpoint,
     data: metadata,
     options: Options(
       headers: <String, String>{
-        'Authorization': 'Bearer $bearerToken',
+        'Authorization': 'Bearer $idToken',
         'Content-Type': 'application/json; charset=utf-8',
       },
     ),
@@ -317,13 +312,12 @@ class AuthRepository {
     final endpoint = _joinUrl(baseUrl, profilePath);
 
     try {
-      final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
       final response = await _dio.get<dynamic>(
         endpoint,
         options: Options(
           headers: <String, String>{
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer $bearerToken',
+            'Authorization': 'Bearer $idToken',
           },
           responseType: ResponseType.json,
         ),

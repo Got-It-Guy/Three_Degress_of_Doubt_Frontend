@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
 import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 
 class MetadataSetupScreen extends StatefulWidget {
@@ -75,16 +74,10 @@ class _MetadataSetupScreenState extends State<MetadataSetupScreen> {
     setState(() => _isInitialLoading = true);
 
     try {
-      String idToken;
-      if (DevAuthConfig.enabled) {
-        idToken = DevAuthConfig.bearerToken;
-      } else {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) return;
-        final token = await user.getIdToken();
-        if (token == null || token.isEmpty) return;
-        idToken = token;
-      }
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final idToken = await user.getIdToken();
+      if (idToken == null || idToken.isEmpty) return;
 
       final profile =
           await _authRepository.fetchMyProfile(idToken: idToken);
@@ -121,9 +114,7 @@ class _MetadataSetupScreenState extends State<MetadataSetupScreen> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
-      final idToken = DevAuthConfig.enabled
-          ? DevAuthConfig.bearerToken
-          : (await user?.getIdToken() ?? "");
+      final idToken = await user?.getIdToken() ?? "";
 
       await _authRepository.updateUserMetadata(
         idToken: idToken,

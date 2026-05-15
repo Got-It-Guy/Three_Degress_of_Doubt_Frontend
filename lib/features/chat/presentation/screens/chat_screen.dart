@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
 import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 import 'package:three_degress_of_doubt_frontend/features/chat/data/chat_repository.dart';
 
@@ -493,9 +492,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<String?> _resolveIdToken() async {
-    if (DevAuthConfig.enabled) {
-      return DevAuthConfig.bearerToken;
-    }
     final user = FirebaseAuth.instance.currentUser;
     return user?.getIdToken();
   }

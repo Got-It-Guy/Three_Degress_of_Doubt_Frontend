@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:three_degress_of_doubt_frontend/core/config/backend_config.dart';
-import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
 
 class ChatMessageDto {
   const ChatMessageDto({
@@ -79,13 +78,12 @@ class ChatRepository {
       BackendConfig.baseUrl,
       BackendConfig.roundsPathByStageId(stageId),
     );
-    final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
     final response = await _dio.post<dynamic>(
       endpoint,
       data: const <String, dynamic>{},
       options: Options(
         headers: <String, String>{
-          'Authorization': 'Bearer $bearerToken',
+          'Authorization': 'Bearer $idToken',
           'Content-Type': 'application/json; charset=utf-8',
         },
       ),
@@ -120,13 +118,12 @@ class ChatRepository {
       BackendConfig.baseUrl,
       BackendConfig.messagesPathByRoundId(roundId),
     );
-    final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
     final response = await _dio.post<dynamic>(
       endpoint,
       data: <String, dynamic>{'content': content},
       options: Options(
         headers: <String, String>{
-          'Authorization': 'Bearer $bearerToken',
+          'Authorization': 'Bearer $idToken',
           'Content-Type': 'application/json; charset=utf-8',
         },
       ),
@@ -157,12 +154,11 @@ class ChatRepository {
       BackendConfig.baseUrl,
       BackendConfig.messagesPathByRoundId(roundId),
     );
-    final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
     final response = await _dio.get<dynamic>(
       endpoint,
       options: Options(
         headers: <String, String>{
-          'Authorization': 'Bearer $bearerToken',
+          'Authorization': 'Bearer $idToken',
           'Content-Type': 'application/json; charset=utf-8',
         },
       ),
@@ -197,13 +193,12 @@ class ChatRepository {
       BackendConfig.baseUrl,
       BackendConfig.judgePathByRoundId(roundId),
     );
-    final bearerToken = DevAuthConfig.resolveBearerToken(idToken);
     final response = await _dio.post<dynamic>(
       endpoint,
       data: <String, dynamic>{'is_fraud_judged': isFraudJudged},
       options: Options(
         headers: <String, String>{
-          'Authorization': 'Bearer $bearerToken',
+          'Authorization': 'Bearer $idToken',
           'Content-Type': 'application/json; charset=utf-8',
         },
       ),
