@@ -88,7 +88,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       debugPrint('[StageFlow] sync -> enter, stage_id=${stage.stageId}');
-      await AppDependencies.authRepository.syncWithBackend(idToken: token);
+      if (!DevAuthConfig.enabled) {
+        await AppDependencies.authRepository.syncWithBackend(idToken: token);
+      }
       await AppDependencies.stageRepository.enterStage(
         stageId: stage.stageId,
         idToken: token,
