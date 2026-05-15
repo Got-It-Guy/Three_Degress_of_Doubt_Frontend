@@ -11,7 +11,7 @@ class ChatMessageDto {
     required this.createdAt,
   });
 
-  final int? messageId;
+  final String? messageId;
   final String? roundId;
   final String role;
   final String content;
@@ -41,11 +41,13 @@ class CreateRoundResult {
     required this.roundId,
     this.scenarioId,
     this.situationPrompt,
+    this.initialMessage,
   });
 
   final String roundId;
   final String? scenarioId;
   final SituationPromptDto? situationPrompt;
+  final ChatMessageDto? initialMessage;
 }
 
 class JudgeRoundResult {
@@ -100,10 +102,12 @@ class ChatRepository {
     }
     final scenarioId = _toIdString(data?['scenario_id']);
     final situationPrompt = _parseSituationPrompt(data?['situation_prompt']);
+    final initialMessage = _parseMessage(data?['initial_message']);
     return CreateRoundResult(
       roundId: roundId,
       scenarioId: scenarioId,
       situationPrompt: situationPrompt,
+      initialMessage: initialMessage,
     );
   }
 
@@ -229,7 +233,7 @@ class ChatRepository {
       return null;
     }
     return ChatMessageDto(
-      messageId: _toInt(item['message_id']) ?? _toInt(item['id']),
+      messageId: _toIdString(item['message_id']) ?? _toIdString(item['id']),
       roundId: _toIdString(item['round_id']),
       role: (item['role']?.toString().trim().toLowerCase() ?? 'ai'),
       content: content,

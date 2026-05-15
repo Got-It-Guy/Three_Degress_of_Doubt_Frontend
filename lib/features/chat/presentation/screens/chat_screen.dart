@@ -31,6 +31,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   late _ScenarioIntroData _scenarioIntroData;
   String? _roundId;
+  String? _pendingInitialAiMessageId;
   String? _pendingInitialAiMessage;
   bool _isTyping = false;
   bool _isRoundInitializing = false;
@@ -66,6 +67,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     try {
+      debugPrint('[StageFlow] enter->rounds, stage_id=${widget.args.stageId}');
       final roundResult = await _chatRepository.createRound(
         stageId: widget.args.stageId,
         idToken: token,
@@ -80,6 +82,7 @@ class _ChatScreenState extends State<ChatScreen> {
         roundResult.situationPrompt,
       );
 
+      final initialFromRound = roundResult.initialMessage;
       final firstAi = fetched
           .where((m) => m.role != 'user' && m.content.trim().isNotEmpty)
           .map((m) => m.content.trim())
@@ -89,7 +92,11 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       setState(() {
         _roundId = roundResult.roundId;
-        _pendingInitialAiMessage = firstAi ?? _scenarioIntroData.firstAiMessage;
+        _pendingInitialAiMessageId = initialFromRound?.messageId;
+        _pendingInitialAiMessage =
+            initialFromRound?.content.trim().isNotEmpty == true
+            ? initialFromRound!.content.trim()
+            : (firstAi ?? _scenarioIntroData.firstAiMessage);
         _scenarioIntroData = _scenarioIntroData.copyWith(
           title: widget.args.stageTitle,
           scenarioSummary: promptSummary.isEmpty
@@ -277,14 +284,23 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _appendInitialAiMessage() {
-    if (!mounted || _messages.isNotEmpty) return;
-    final text = (_pendingInitialAiMessage ?? _scenarioIntroData.firstAiMessage).trim();
+    if (!mounted) return;
+    final text =
+        (_pendingInitialAiMessage ?? _scenarioIntroData.firstAiMessage).trim();
     if (text.isEmpty) return;
+
+    final id =
+        (_pendingInitialAiMessageId != null &&
+            _pendingInitialAiMessageId!.trim().isNotEmpty)
+        ? _pendingInitialAiMessageId!.trim()
+        : 'initial-${DateTime.now().microsecondsSinceEpoch}';
+    final alreadyExists = _messages.any((m) => m.id == id);
+    if (alreadyExists) return;
 
     setState(() {
       _messages.add(
         _ChatMessage(
-          id: 'initial-${DateTime.now().microsecondsSinceEpoch}',
+          id: id,
           text: text,
           isUser: false,
           timestamp: DateTime.now(),
@@ -486,7 +502,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   _ChatMessage _fromDto(ChatMessageDto dto) {
     return _ChatMessage(
-      id: (dto.messageId ?? DateTime.now().microsecondsSinceEpoch).toString(),
+      id: dto.messageId ?? 'msg-${DateTime.now().microsecondsSinceEpoch}',
       text: dto.content,
       isUser: dto.role == 'user',
       timestamp: dto.createdAt,
