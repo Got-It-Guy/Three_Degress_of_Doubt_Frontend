@@ -1,7 +1,9 @@
-import 'dart:async';
 import 'dart:math';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
+import 'package:three_degress_of_doubt_frontend/features/chat/data/chat_repository.dart';
 
 class ChatScreenArgs {
   const ChatScreenArgs({required this.stageId, required this.stageTitle});
@@ -22,352 +24,202 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final Random _random = Random();
+  final ChatRepository _chatRepository = AppDependencies.chatRepository;
 
-  late final List<_ChatMessage> _messages;
-  late final _ScenarioIntroData _scenarioIntroData;
+  final List<_ChatMessage> _messages = <_ChatMessage>[];
+
+  late _ScenarioIntroData _scenarioIntroData;
+  String? _roundId;
+  String? _pendingInitialAiMessageId;
+  String? _pendingInitialAiMessage;
+  
+  int _currentScore = 0;
+  int _currentWarning = 0;
+  int _totalRoundsPlayed = 0; 
+
   bool _isTyping = false;
-  int _messageIdSeed = 1000;
-  Timer? _pendingReplyTimer;
+  bool _isRoundInitializing = false;
+  String _roundLoadingText = '시나리오를 준비 중입니다...';
   _JudgmentType? _judgmentType;
 
   @override
   void initState() {
     super.initState();
-    _messages = [];
     _scenarioIntroData = _scenarioDataByStageId(widget.args.stageId);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showScenarioIntroModal();
+      _prepareRoundAndShowScenarioModal();
     });
   }
 
   @override
   void dispose() {
-    _pendingReplyTimer?.cancel();
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _sendMessage() {
-    final input = _inputController.text.trim();
-    if (input.isEmpty) {
+  Future<void> _prepareRoundAndShowScenarioModal() async {
+    if (!mounted || _isRoundInitializing) return;
+
+    setState(() {
+      _isRoundInitializing = true;
+      _roundLoadingText = '시나리오를 불러오는 중...';
+      _messages.clear();
+    });
+
+    final token = await _resolveIdToken();
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      setState(() => _isRoundInitializing = false);
+      _showSnack('인증 토큰을 확인할 수 없습니다.');
       return;
     }
 
-    final userMessage = _ChatMessage(
-      id: 'm${_messageIdSeed++}',
-      text: input,
-      isUser: true,
-      timestamp: DateTime.now(),
-    );
+    try {
+      debugPrint('[StageFlow] enter->rounds, stage_id=${widget.args.stageId}');
+      final roundResult = await _chatRepository.createRound(
+        stageId: widget.args.stageId,
+        idToken: token,
+      );
+
+      if (mounted) {
+        setState(() {
+          _roundLoadingText = 'AI가 첫 메시지를 생성 중입니다...';
+        });
+      }
+
+      final fetched = await _chatRepository.fetchMessages(
+        roundId: roundResult.roundId,
+        idToken: token,
+      );
+
+      final promptSummary = _buildScenarioSummaryFromPrompt(
+        roundResult.situationPrompt,
+      );
+
+      final initialFromRound = roundResult.initialMessage;
+      final firstAi = fetched
+          .where((m) => m.role != 'user' && m.content.trim().isNotEmpty)
+          .map((m) => m.content.trim())
+          .cast<String?>()
+          .firstWhere((e) => e != null, orElse: () => null);
+
+      if (!mounted) return;
+      setState(() {
+        _roundId = roundResult.roundId;
+        _pendingInitialAiMessageId = initialFromRound?.messageId;
+        _pendingInitialAiMessage =
+            initialFromRound?.content.trim().isNotEmpty == true
+            ? initialFromRound!.content.trim()
+            : (firstAi ?? _scenarioIntroData.firstAiMessage);
+        _scenarioIntroData = _scenarioIntroData.copyWith(
+          title: widget.args.stageTitle,
+          scenarioSummary: promptSummary.isEmpty
+              ? _scenarioIntroData.scenarioSummary
+              : promptSummary,
+        );
+        _isRoundInitializing = false;
+      });
+
+      await _showScenarioIntroModal();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isRoundInitializing = false);
+      _showSnack('라운드 초기화 중 오류가 발생했습니다.');
+    }
+  }
+
+  Future<void> _sendMessage() async {
+    final input = _inputController.text.trim();
+    if (input.isEmpty || _isRoundInitializing) return;
+    if (_roundId == null) {
+      _showSnack('라운드가 준비되지 않았습니다.');
+      return;
+    }
+
+    final token = await _resolveIdToken();
+    if (token == null || token.isEmpty) {
+      _showSnack('인증 토큰을 확인할 수 없습니다.');
+      return;
+    }
+
+    final tempId = 'temp-${DateTime.now().microsecondsSinceEpoch}';
 
     setState(() {
-      _messages.add(userMessage);
+      _messages.add(
+        _ChatMessage(
+          id: tempId,
+          text: input,
+          isUser: true,
+          timestamp: DateTime.now(),
+        ),
+      );
       _inputController.clear();
       _isTyping = true;
     });
     _scrollToBottom();
 
-    _pendingReplyTimer?.cancel();
-    final delayMs = 1500 + _random.nextInt(1501);
-    _pendingReplyTimer = Timer(Duration(milliseconds: delayMs), () {
-      if (!mounted) {
-        return;
-      }
-      final reply = _ChatMessage(
-        id: 'm${_messageIdSeed++}',
-        text: _randomReply(),
-        isUser: false,
-        timestamp: DateTime.now(),
+    try {
+      final result = await _chatRepository.sendMessage(
+        roundId: _roundId!,
+        content: input,
+        idToken: token,
       );
+
+      final fetched = await _chatRepository.fetchMessages(
+        roundId: _roundId!,
+        idToken: token,
+      );
+
+      if (!mounted) return;
+      final mapped = fetched.map(_fromDto).toList();
+      
+      if (mapped.isNotEmpty) {
+        setState(() {
+          _messages.removeWhere((m) => m.id.startsWith('temp-'));
+          
+          for (var newMessage in mapped) {
+            if (!_messages.any((m) => m.id == newMessage.id)) {
+              _messages.add(newMessage);
+            }
+          }
+          _isTyping = false;
+        });
+      } else {
+        final fallbackAi = result.messages.isNotEmpty
+            ? _fromDto(result.messages.first)
+            : _ChatMessage(
+                id: 'ai-${DateTime.now().microsecondsSinceEpoch}',
+                text: '응답을 가져오지 못했습니다.',
+                isUser: false,
+                timestamp: DateTime.now(),
+              );
+        setState(() {
+          _messages.add(fallbackAi);
+          _isTyping = false;
+        });
+      }
+      _scrollToBottom();
+    } catch (error) {
+      if (!mounted) return;
       setState(() {
         _isTyping = false;
-        _messages.add(reply);
       });
-      _scrollToBottom();
-    });
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) {
-        return;
-      }
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const bgColor = Color(0xFF020911);
-    const headerColor = Color(0xFF09141F);
-    const borderColor = Color(0xFF1A2635);
-    const incomingBubbleColor = Color(0xFF1D2733);
-    const outgoingBubbleColor = Color(0xFF00D64F);
-
-    return Scaffold(
-      backgroundColor: bgColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              height: 68,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: const BoxDecoration(
-                color: headerColor,
-                border: Border(
-                  bottom: BorderSide(color: borderColor, width: 1),
-                ),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.args.stageTitle,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          '상대방과 대화 중',
-                          style: TextStyle(
-                            color: Color(0xFF94A1AF),
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _showJudgmentModal,
-                    icon: const Icon(Icons.pause, size: 16),
-                    label: const Text('판정'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: outgoingBubbleColor,
-                      side: const BorderSide(color: outgoingBubbleColor),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-                itemCount: _messages.length + (_isTyping ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (_isTyping && index == _messages.length) {
-                    return const _TypingIndicator();
-                  }
-                  final message = _messages[index];
-                  final isUser = message.isUser;
-
-                  return Align(
-                    alignment: isUser
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.74,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isUser
-                            ? outgoingBubbleColor
-                            : incomingBubbleColor,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            message.text,
-                            style: TextStyle(
-                              color: isUser
-                                  ? const Color(0xFF04330A)
-                                  : Colors.white,
-                              fontSize: 15,
-                              height: 1.35,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            _timeLabel(message.timestamp),
-                            style: TextStyle(
-                              color: isUser
-                                  ? const Color(0xFF0F6620)
-                                  : const Color(0xFF8A98A8),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            Container(
-              decoration: const BoxDecoration(
-                color: headerColor,
-                border: Border(top: BorderSide(color: borderColor, width: 1)),
-              ),
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF151F2A),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: TextField(
-                        controller: _inputController,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        onSubmitted: (_) => _sendMessage(),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          hintText: '메시지를 입력하세요...',
-                          hintStyle: TextStyle(
-                            color: Color(0xFF6B7888),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  ListenableBuilder(
-                    listenable: _inputController,
-                    builder: (context, _) {
-                      final enabled = _inputController.text.trim().isNotEmpty;
-                      return Material(
-                        color: enabled
-                            ? outgoingBubbleColor
-                            : outgoingBubbleColor.withValues(alpha: 0.45),
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: enabled ? _sendMessage : null,
-                          child: const SizedBox(
-                            width: 46,
-                            height: 46,
-                            child: Icon(
-                              Icons.send_rounded,
-                              color: Color(0xFF04330A),
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _timeLabel(DateTime time) {
-    final period = time.hour < 12 ? '오전' : '오후';
-    final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$period $hour:$minute';
-  }
-
-  _ScenarioIntroData _scenarioDataByStageId(int stageId) {
-    switch (stageId) {
-      case 1:
-        return const _ScenarioIntroData(
-          title: '보이스피싱',
-          counterpartInfo: '김민수 수사관 (금융감독원 사칭)',
-          scenarioSummary: '금융기관을 사칭해 계좌가 범죄에 연루됐다고 압박하며 개인정보와 자금 이체를 유도합니다.',
-          firstAiMessage: '안녕하세요, 금융감독원입니다. 고객님 명의로 대포통장이 개설되어 연락드렸습니다.',
-        );
-      case 2:
-        return const _ScenarioIntroData(
-          title: '투자사기',
-          counterpartInfo: '박도윤 팀장 (투자리딩방 운영자)',
-          scenarioSummary:
-              '단기간 고수익을 보장한다고 접근하고, 급하게 입금을 유도한 뒤 추가 입금을 반복 요구합니다.',
-          firstAiMessage: '안녕하세요! 저희 투자 그룹에서 월 30% 수익을 보장하는 특별한 기회가 있습니다.',
-        );
-      case 3:
-        return const _ScenarioIntroData(
-          title: '부동산사기',
-          counterpartInfo: '김철수 공인중개사',
-          scenarioSummary: '실제와 다른 매물 정보로 신뢰를 만든 후 계약금 선이체를 유도해 금전 피해를 노립니다.',
-          firstAiMessage: '안녕하세요. 급매 전세 매물이 나와서 안내드립니다. 오늘 안에 계약금 이체가 필요합니다.',
-        );
-      case 4:
-        return const _ScenarioIntroData(
-          title: '대출사기',
-          counterpartInfo: '이재훈 상담사 (정책금융기관 사칭)',
-          scenarioSummary: '저금리 대출 승인 대상이라며 접근해 보증료·수수료 명목의 선입금을 요구합니다.',
-          firstAiMessage: '정부지원 저금리 대출 승인 대상입니다. 선입금 수수료를 보내주시면 즉시 실행됩니다.',
-        );
-      case 5:
-        return const _ScenarioIntroData(
-          title: '중고사기',
-          counterpartInfo: '최유진 구매자',
-          scenarioSummary: '급히 거래하겠다며 신뢰를 유도하고, 안전결제 링크나 환불 명목으로 추가 정보를 요구합니다.',
-          firstAiMessage: '안녕하세요, 올려주신 상품 보고 연락드려요. 급하게 구해서 바로 입금 가능합니다!',
-        );
-      case 6:
-      default:
-        return const _ScenarioIntroData(
-          title: '랜덤',
-          counterpartInfo: '정우성 담당자 (기관 사칭)',
-          scenarioSummary: '공공기관을 사칭해 환급, 지원금, 조사 등을 빌미로 개인정보 입력 또는 송금을 유도합니다.',
-          firstAiMessage: '안녕하세요, 국세청입니다. 환급금 지급을 위해 계좌 확인이 필요합니다.',
-        );
+      _showSnack('메시지 전송 중 오류: $error');
     }
   }
 
+  void _onJudgmentButtonPressed() {
+    if (_messages.where((m) => m.isUser).isEmpty) {
+      _showSnack('최소 1회 이상 대화를 진행해야 판정할 수 있습니다.');
+      return;
+    }
+    _showJudgmentModal();
+  }
+
   Future<void> _showScenarioIntroModal() async {
+    final aiName = _scenarioIntroData.counterpartInfo; 
+
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -388,7 +240,7 @@ class _ChatScreenState extends State<ChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _scenarioIntroData.title,
+                  _scenarioIntroData.title, 
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
@@ -396,15 +248,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                _buildIntroSection(
-                  '상대방 정보',
-                  _scenarioIntroData.counterpartInfo,
-                ),
-                const SizedBox(height: 10),
-                _buildIntroSection(
-                  '시나리오 설명',
-                  _scenarioIntroData.scenarioSummary,
-                ),
+                
+                _buildIntroSection('수신 정보', '$aiName에게서 메시지가 도착했습니다.'),
+                
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
@@ -412,7 +258,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.pop(dialogContext);
-                      _appendFirstAiMessage();
+                      _appendInitialAiMessage(); 
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0B7A33),
@@ -420,12 +266,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
                     ),
-                    child: const Text('확인'),
+                    child: const Text('대화 확인하기', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                   ),
                 ),
               ],
@@ -471,16 +313,25 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _appendFirstAiMessage() {
-    if (!mounted || _messages.isNotEmpty) {
-      return;
-    }
+  void _appendInitialAiMessage() {
+    if (!mounted) return;
+    final text =
+        (_pendingInitialAiMessage ?? _scenarioIntroData.firstAiMessage).trim();
+    if (text.isEmpty) return;
+
+    final id =
+        (_pendingInitialAiMessageId != null &&
+            _pendingInitialAiMessageId!.trim().isNotEmpty)
+        ? _pendingInitialAiMessageId!.trim()
+        : 'initial-${DateTime.now().microsecondsSinceEpoch}';
+    final alreadyExists = _messages.any((m) => m.id == id);
+    if (alreadyExists) return;
 
     setState(() {
       _messages.add(
         _ChatMessage(
-          id: 'initial',
-          text: _scenarioIntroData.firstAiMessage,
+          id: id,
+          text: text,
           isUser: false,
           timestamp: DateTime.now(),
         ),
@@ -489,20 +340,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
-  String _randomReply() {
-    const responses = [
-      '네, 맞습니다. 빠른 처리를 위해 지금 바로 계좌 정보를 알려주시겠어요?',
-      '걱정하지 마세요. 도와드릴게요. 본인 확인을 위해 주민번호를 알려주세요.',
-      '지금 처리하지 않으면 법적 조치가 진행됩니다. 바로 진행하시죠.',
-      '다른 분들은 이미 큰 수익을 얻고 계십니다. 기회를 놓치지 마세요.',
-      '보안을 위해 이 번호로 전화 주시면 안전하게 처리해 드리겠습니다.',
-    ];
-    return responses[_random.nextInt(responses.length)];
-  }
-
   Future<void> _showJudgmentModal() async {
     _judgmentType = null;
-
     await showDialog<void>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.62),
@@ -518,9 +357,7 @@ class _ChatScreenState extends State<ChatScreen> {
               return Expanded(
                 child: GestureDetector(
                   onTap: () {
-                    setModalState(() {
-                      _judgmentType = type;
-                    });
+                    setModalState(() => _judgmentType = type);
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 130),
@@ -565,7 +402,6 @@ class _ChatScreenState extends State<ChatScreen> {
               );
             }
 
-            final canConfirm = _judgmentType != null;
             return Dialog(
               insetPadding: const EdgeInsets.symmetric(horizontal: 20),
               backgroundColor: Colors.transparent,
@@ -574,10 +410,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF09131E),
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: const Color(0xFF1E2B3D),
-                    width: 1.1,
-                  ),
+                  border: Border.all(color: const Color(0xFF1E2B3D), width: 1.1),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -617,7 +450,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         const SizedBox(width: 10),
                         buildChoice(
                           type: _JudgmentType.unknown,
-                          label: '모름',
+                          label: '모름/정상',
                           icon: Icons.gpp_maybe_outlined,
                         ),
                       ],
@@ -627,9 +460,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: canConfirm
-                            ? () => _confirmJudgment(dialogContext)
-                            : null,
+                        onPressed: _judgmentType == null
+                            ? null
+                            : () => _confirmJudgment(dialogContext),
                         style: ElevatedButton.styleFrom(
                           disabledBackgroundColor: const Color(0xFF19412B),
                           backgroundColor: const Color(0xFF0B7A33),
@@ -642,7 +475,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        child: const Text('확인'),
+                        child: const Text('판정하기'),
                       ),
                     ),
                   ],
@@ -655,19 +488,598 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _confirmJudgment(BuildContext dialogContext) {
+  Future<void> _confirmJudgment(BuildContext dialogContext) async {
     final selected = _judgmentType;
-    if (selected == null) {
+    if (selected == null) return;
+
+    Navigator.pop(dialogContext); 
+
+    if (_roundId == null) {
+      _showSnack('라운드 정보가 없습니다.');
+      return;
+    }
+    
+    final token = await _resolveIdToken();
+    if (token == null || token.isEmpty) {
+      _showSnack('인증 토큰을 확인할 수 없습니다.');
       return;
     }
 
-    if (selected == _JudgmentType.scam) {
-      Navigator.pop(dialogContext);
-      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-      return;
+    setState(() {
+      _isRoundInitializing = true;
+      _roundLoadingText = '판정 및 리포트 생성 중...';
+      _totalRoundsPlayed++;
+    });
+
+    try {
+      final isFraud = selected == _JudgmentType.scam;
+      
+      final judgeResult = await _chatRepository.judgeRound(
+        roundId: _roundId!,
+        isFraudJudged: isFraud,
+        idToken: token,
+      );
+
+      final report = await _chatRepository.fetchReport(
+        roundId: _roundId!,
+        idToken: token,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentScore = judgeResult.currentScore;
+        _currentWarning = judgeResult.currentWarning;
+        _isRoundInitializing = false;
+      });
+
+      if (judgeResult.isStageCleared) {
+        _showStageClearDialog(report);
+      } else {
+        _showRoundFeedbackDialog(
+          type: judgeResult.result,
+          score: judgeResult.currentScore,
+          report: report,
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isRoundInitializing = false);
+      _showSnack('판정 처리 실패: $error');
+    }
+  }
+
+  void _showRoundFeedbackDialog({
+    required String type,
+    required int score,
+    required RoundReportDto report,
+  }) {
+    String title;
+    Color titleColor;
+
+    if (type == 'pass') {
+      title = "판정 성공! ($score/3 스택)";
+      titleColor = const Color(0xFF00D64F);
+    } else if (type == 'reset') {
+      title = "초기화됨 (경고 2회 누적)";
+      titleColor = Colors.redAccent;
+    } else {
+      title = "판정 실패 (경고 누적)";
+      titleColor = Colors.orangeAccent;
     }
 
-    Navigator.pop(dialogContext);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF09131E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF1E2B3D), width: 1.1),
+          ),
+          title: Text(
+            title,
+            style: TextStyle(
+              color: titleColor,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  report.summary,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    height: 1.4,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (report.fraudPoints.isNotEmpty) ...[
+                  const Text(
+                    "💡 주요 탐지 포인트",
+                    style: TextStyle(
+                      color: Color(0xFF00D64F),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "• ${report.fraudPoints[0]['reason']}",
+                    style: const TextStyle(
+                      color: Color(0xFFA6B1BD),
+                      fontSize: 13,
+                      height: 1.3,
+                    ),
+                  ),
+                  if (report.fraudPoints[0]['tip'] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Text(
+                        "Tip: ${report.fraudPoints[0]['tip']}",
+                        style: const TextStyle(
+                          color: Color(0xFF8A98A8),
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                ]
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _prepareRoundAndShowScenarioModal(); 
+              },
+              child: const Text(
+                "다음 대화 진행",
+                style: TextStyle(
+                  color: Color(0xFF00D64F),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showStageClearDialog(RoundReportDto report) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF09131E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF00D64F), width: 1.5),
+          ),
+          title: const Text(
+            "🎉 스테이지 클리어!",
+            style: TextStyle(
+              color: Colors.yellowAccent,
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '총 소요 라운드: $_totalRoundsPlayed',
+                style: const TextStyle(
+                  color: Color(0xFF00D64F),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                report.summary,
+                style: const TextStyle(
+                  color: Colors.white,
+                  height: 1.4,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0B7A33),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text("홈으로 돌아가기"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<String?> _resolveIdToken() async {
+    final user = FirebaseAuth.instance.currentUser;
+    return user?.getIdToken();
+  }
+
+  _ChatMessage _fromDto(ChatMessageDto dto) {
+    return _ChatMessage(
+      id: dto.messageId ?? 'msg-${DateTime.now().microsecondsSinceEpoch}',
+      text: dto.content,
+      isUser: dto.role == 'user',
+      timestamp: dto.createdAt,
+    );
+  }
+
+  String _buildScenarioSummaryFromPrompt(SituationPromptDto? prompt) {
+    if (prompt == null) return '';
+    final lines = <String>[];
+    if (prompt.situation.trim().isNotEmpty) {
+      lines.add('상황: ${prompt.situation.trim()}');
+    }
+    if (prompt.currentStage.trim().isNotEmpty) {
+      lines.add('현재 단계: ${prompt.currentStage.trim()}');
+    }
+    if (prompt.userIntent.trim().isNotEmpty) {
+      lines.add('의도: ${prompt.userIntent.trim()}');
+    }
+    return lines.join('\n');
+  }
+
+  _ScenarioIntroData _scenarioDataByStageId(int stageId) {
+    switch (stageId) {
+      case 1:
+        return const _ScenarioIntroData(
+          title: '보이스피싱',
+          counterpartInfo: '김민수 수사관 (금융감독원 사칭)',
+          scenarioSummary: '금융기관을 사칭해 계좌가 범죄에 연루됐다고 압박하며 개인정보와 자금 이체를 유도합니다.',
+          firstAiMessage: '안녕하세요, 금융감독원입니다. 고객님 명의로 대포통장이 개설되어 연락드렸습니다.',
+        );
+      case 2:
+        return const _ScenarioIntroData(
+          title: '투자사기',
+          counterpartInfo: '박도윤 팀장 (투자리딩방 운영자)',
+          scenarioSummary: '단기간 고수익을 보장한다고 접근하고, 급하게 입금을 유도한 뒤 추가 입금을 반복 요구합니다.',
+          firstAiMessage: '안녕하세요! 저희 투자 그룹에서 월 30% 수익을 보장하는 특별한 기회가 있습니다.',
+        );
+      case 3:
+        return const _ScenarioIntroData(
+          title: '부동산사기',
+          counterpartInfo: '김철수 공인중개사',
+          scenarioSummary: '실제와 다른 매물 정보로 신뢰를 만든 후 계약금 선이체를 유도해 금전 피해를 노립니다.',
+          firstAiMessage: '안녕하세요. 급매 전세 매물이 나와서 안내드립니다. 오늘 안에 계약금 이체가 필요합니다.',
+        );
+      case 4:
+        return const _ScenarioIntroData(
+          title: '대출사기',
+          counterpartInfo: '이재훈 상담사 (정책금융기관 사칭)',
+          scenarioSummary: '저금리 대출 승인 대상이라며 접근해 보증료·수수료 명목의 선입금을 요구합니다.',
+          firstAiMessage: '정부지원 저금리 대출 승인 대상입니다. 선입금 수수료를 보내주시면 즉시 실행됩니다.',
+        );
+      case 5:
+        return const _ScenarioIntroData(
+          title: '중고사기',
+          counterpartInfo: '최유진 구매자',
+          scenarioSummary: '급히 거래하겠다며 신뢰를 유도하고, 안전결제 링크나 환불 명목으로 추가 정보를 요구합니다.',
+          firstAiMessage: '안녕하세요, 올려주신 상품 보고 연락드려요. 급하게 구해서 바로 입금 가능합니다!',
+        );
+      case 6:
+      default:
+        return const _ScenarioIntroData(
+          title: '랜덤',
+          counterpartInfo: '정우성 담당자 (기관 사칭)',
+          scenarioSummary: '공공기관을 사칭해 환급, 지원금, 조사 등을 빌미로 개인정보 입력 또는 송금을 유도합니다.',
+          firstAiMessage: '안녕하세요, 국세청입니다. 환급금 지급을 위해 계좌 확인이 필요합니다.',
+        );
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  String _timeLabel(DateTime time) {
+    final period = time.hour < 12 ? '오전' : '오후';
+    final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$period $hour:$minute';
+  }
+
+  void _showSnack(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const bgColor = Color(0xFF020911);
+    const headerColor = Color(0xFF09141F);
+    const borderColor = Color(0xFF1A2635);
+    const incomingBubbleColor = Color(0xFF1D2733);
+    const outgoingBubbleColor = Color(0xFF00D64F);
+
+    return Scaffold(
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Container(
+                  height: 68,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: const BoxDecoration(
+                    color: headerColor,
+                    border: Border(
+                      bottom: BorderSide(color: borderColor, width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.args.stageTitle,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '진행도: $_currentScore/3 | 경고: $_currentWarning/2',
+                              style: const TextStyle(
+                                color: outgoingBubbleColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _onJudgmentButtonPressed,
+                        icon: const Icon(Icons.gavel, size: 16),
+                        label: const Text('판정'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: outgoingBubbleColor,
+                          side: const BorderSide(color: outgoingBubbleColor),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+                    itemCount: _messages.length + (_isTyping ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (_isTyping && index == _messages.length) {
+                        return const _TypingIndicator();
+                      }
+                      final message = _messages[index];
+                      final isUser = message.isUser;
+
+                      return Align(
+                        alignment: isUser
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.74,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isUser ? outgoingBubbleColor : incomingBubbleColor,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                message.text,
+                                style: TextStyle(
+                                  color: isUser ? const Color(0xFF04330A) : Colors.white,
+                                  fontSize: 15,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _timeLabel(message.timestamp),
+                                style: TextStyle(
+                                  color: isUser
+                                      ? const Color(0xFF0F6620)
+                                      : const Color(0xFF8A98A8),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Container(
+                  decoration: const BoxDecoration(
+                    color: headerColor,
+                    border: Border(top: BorderSide(color: borderColor, width: 1)),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF151F2A),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: TextField(
+                            controller: _inputController,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            onSubmitted: (_) => _sendMessage(),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              hintText: '메시지를 입력하세요...',
+                              hintStyle: TextStyle(
+                                color: Color(0xFF6B7888),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      ListenableBuilder(
+                        listenable: _inputController,
+                        builder: (context, _) {
+                          final enabled = _inputController.text.trim().isNotEmpty;
+                          return Material(
+                            color: enabled
+                                ? outgoingBubbleColor
+                                : outgoingBubbleColor.withValues(alpha: 0.45),
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: enabled ? _sendMessage : null,
+                              child: const SizedBox(
+                                width: 46,
+                                height: 46,
+                                child: Icon(
+                                  Icons.send_rounded,
+                                  color: Color(0xFF04330A),
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (_isRoundInitializing)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.62),
+                  alignment: Alignment.center,
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 28),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 18,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF09131E),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF1E2B3D),
+                        width: 1.1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 30,
+                          height: 30,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.8,
+                            color: Color(0xFF00D64F),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _roundLoadingText,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        const Text(
+                          '잠시만 기다려주세요.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFF94A1AF),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -764,4 +1176,18 @@ class _ScenarioIntroData {
   final String counterpartInfo;
   final String scenarioSummary;
   final String firstAiMessage;
+
+  _ScenarioIntroData copyWith({
+    String? title,
+    String? counterpartInfo,
+    String? scenarioSummary,
+    String? firstAiMessage,
+  }) {
+    return _ScenarioIntroData(
+      title: title ?? this.title,
+      counterpartInfo: counterpartInfo ?? this.counterpartInfo,
+      scenarioSummary: scenarioSummary ?? this.scenarioSummary,
+      firstAiMessage: firstAiMessage ?? this.firstAiMessage,
+    );
+  }
 }

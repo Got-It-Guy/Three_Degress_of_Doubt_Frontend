@@ -14,6 +14,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingProgress = true;
   String? _progressError;
   late List<_StageCardData> _stages;
+  bool _isEnteringStage = false;
 
   @override
   void initState() {
@@ -28,7 +29,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (user == null) {
         throw StateError('로그인 정보가 없습니다. 다시 로그인해주세요.');
       }
-
       final idToken = await user.getIdToken();
       if (idToken == null || idToken.isEmpty) {
         throw StateError('인증 토큰을 가져오지 못했습니다.');
@@ -40,15 +40,17 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       setState(() {
-        _stages = _baseStages().map((stage) {
-          final progress = progressByStageId[stage.stageId];
-          final isCleared = progress?.isCleared ?? false;
-          final stageScore = progress?.stageScore ?? 0;
-          return stage.copyWith(
-            isDone: isCleared,
-            rounds: isCleared ? stageScore : 0,
-          );
-        }).toList();
+  _stages = _baseStages().map((stage) {
+    final progress = progressByStageId[stage.stageId];
+    final isCleared = progress?.isCleared ?? false;
+    
+    final rounds = progress?.totalRounds ?? 0; 
+
+    return stage.copyWith(
+      isDone: isCleared,
+      rounds: isCleared ? rounds : 0,
+    );
+  }).toList();
         _progressError = null;
         _isLoadingProgress = false;
       });
@@ -59,6 +61,59 @@ class _HomeScreenState extends State<HomeScreen> {
         _progressError = error.toString();
         _isLoadingProgress = false;
       });
+    }
+  }
+
+  Future<String?> _resolveIdToken() async {
+    final user = FirebaseAuth.instance.currentUser;
+    return user?.getIdToken();
+  }
+
+  Future<void> _handleStageTap(_StageCardData stage) async {
+    if (_isEnteringStage) return;
+
+    setState(() {
+      _isEnteringStage = true;
+    });
+
+    final token = await _resolveIdToken();
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _isEnteringStage = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('인증 토큰을 가져오지 못했습니다.')));
+      return;
+    }
+
+    try {
+      await AppDependencies.authRepository.syncWithBackend(idToken: token);
+      await AppDependencies.stageRepository.enterStage(
+        stageId: stage.stageId,
+        idToken: token,
+      );
+      if (!mounted) return;
+      await Navigator.pushNamed(
+        context,
+        '/chat',
+        arguments: ChatScreenArgs(
+          stageId: stage.stageId,
+          stageTitle: stage.title,
+        ),
+      );
+    } on Exception catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('스테이지 입장 실패: $error')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isEnteringStage = false;
+        });
+      }
     }
   }
 
@@ -313,16 +368,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          Navigator.pushNamed(
-            context,
-            '/chat',
-            arguments: ChatScreenArgs(
-              stageId: stage.stageId,
-              stageTitle: stage.title,
-            ),
-          );
-        },
+        onTap: () => _handleStageTap(stage),
         borderRadius: BorderRadius.circular(20),
         hoverColor: Colors.white.withValues(alpha: 0.05),
         highlightColor: Colors.white.withValues(alpha: 0.1),

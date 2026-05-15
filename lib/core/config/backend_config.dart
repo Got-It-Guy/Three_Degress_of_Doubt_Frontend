@@ -1,3 +1,5 @@
+import 'package:three_degress_of_doubt_frontend/core/config/dev_auth_config.dart';
+
 class BackendConfig {
   BackendConfig._();
 
@@ -8,6 +10,9 @@ class BackendConfig {
     );
     if (envBaseUrl.isNotEmpty) {
       return envBaseUrl;
+    }
+    if (DevAuthConfig.enabled) {
+      return 'http://10.0.2.2:8000';
     }
     return _defaultBaseUrl();
   }
@@ -40,22 +45,43 @@ class BackendConfig {
     );
   }
 
-  static Duration get connectTimeout {
-    return Duration(seconds: _readInt('BACKEND_CONNECT_TIMEOUT_SEC', 10));
+  static String roundsPathByStageId(int stageId) {
+    return '/api/v1/stages/$stageId/rounds';
   }
 
-  static Duration get sendTimeout {
-    return Duration(seconds: _readInt('BACKEND_SEND_TIMEOUT_SEC', 15));
+  static String enterPathByStageId(int stageId) {
+    return '/api/v1/stages/$stageId/enter';
   }
 
-  static Duration get receiveTimeout {
-    return Duration(seconds: _readInt('BACKEND_RECEIVE_TIMEOUT_SEC', 15));
+  static String messagesPathByRoundId(String roundId) {
+    return '/api/v1/rounds/$roundId/messages';
   }
 
-  static int _readInt(String key, int fallback) {
+  static String judgePathByRoundId(String roundId) {
+    return '/api/v1/rounds/$roundId/judge';
+  }
+  static Duration? get connectTimeout {
+    return _readOptionalDuration('BACKEND_CONNECT_TIMEOUT_SEC');
+  }
+
+  static Duration? get sendTimeout {
+    return _readOptionalDuration('BACKEND_SEND_TIMEOUT_SEC');
+  }
+
+  static Duration? get receiveTimeout {
+    return _readOptionalDuration('BACKEND_RECEIVE_TIMEOUT_SEC');
+  }
+
+  static Duration? _readOptionalDuration(String key) {
     final value = String.fromEnvironment(key, defaultValue: '');
+    if (value.trim().isEmpty) {
+      return null;
+    }
     final parsed = int.tryParse(value);
-    return (parsed != null && parsed > 0) ? parsed : fallback;
+    if (parsed == null || parsed <= 0) {
+      return null;
+    }
+    return Duration(seconds: parsed);
   }
 
   static String _defaultBaseUrl() {

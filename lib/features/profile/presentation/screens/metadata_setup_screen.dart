@@ -75,12 +75,9 @@ class _MetadataSetupScreenState extends State<MetadataSetupScreen> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
-
       if (user == null) return;
-
       final idToken = await user.getIdToken();
-
-      if (idToken == null) return;
+      if (idToken == null || idToken.isEmpty) return;
 
       final profile =
           await _authRepository.fetchMyProfile(idToken: idToken);

@@ -294,13 +294,13 @@ class AuthRepository {
   final baseUrl = BackendConfig.baseUrl;
   final metadataPath = BackendConfig.userMetadataPath;
   final endpoint = _joinUrl(baseUrl, metadataPath);
-
   await _dio.patch(
     endpoint,
     data: metadata,
     options: Options(
-      headers: {
+      headers: <String, String>{
         'Authorization': 'Bearer $idToken',
+        'Content-Type': 'application/json; charset=utf-8',
       },
     ),
   );
