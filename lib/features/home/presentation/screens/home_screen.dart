@@ -14,6 +14,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingProgress = true;
   String? _progressError;
   late List<_StageCardData> _stages;
+  bool _isEnteringStage = false;
 
   @override
   void initState() {
@@ -39,15 +40,17 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       setState(() {
-        _stages = _baseStages().map((stage) {
-          final progress = progressByStageId[stage.stageId];
-          final isCleared = progress?.isCleared ?? false;
-          final stageScore = progress?.stageScore ?? 0;
-          return stage.copyWith(
-            isDone: isCleared,
-            rounds: isCleared ? stageScore : 0,
-          );
-        }).toList();
+  _stages = _baseStages().map((stage) {
+    final progress = progressByStageId[stage.stageId];
+    final isCleared = progress?.isCleared ?? false;
+    
+    final rounds = progress?.totalRounds ?? 0; 
+
+    return stage.copyWith(
+      isDone: isCleared,
+      rounds: isCleared ? rounds : 0,
+    );
+  }).toList();
         _progressError = null;
         _isLoadingProgress = false;
       });
@@ -67,9 +70,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _handleStageTap(_StageCardData stage) async {
+    if (_isEnteringStage) return;
+
+    setState(() {
+      _isEnteringStage = true;
+    });
+
     final token = await _resolveIdToken();
     if (token == null || token.isEmpty) {
       if (!mounted) return;
+      setState(() {
+        _isEnteringStage = false;
+      });
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('인증 토큰을 가져오지 못했습니다.')));
@@ -77,14 +89,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      debugPrint('[StageFlow] sync -> enter, stage_id=${stage.stageId}');
       await AppDependencies.authRepository.syncWithBackend(idToken: token);
       await AppDependencies.stageRepository.enterStage(
         stageId: stage.stageId,
         idToken: token,
       );
       if (!mounted) return;
-      Navigator.pushNamed(
+      await Navigator.pushNamed(
         context,
         '/chat',
         arguments: ChatScreenArgs(
@@ -97,6 +108,12 @@ class _HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('스테이지 입장 실패: $error')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isEnteringStage = false;
+        });
+      }
     }
   }
 

@@ -9,6 +9,7 @@ class StageProgress {
     this.thumbnailUrl,          
     required this.stageScore,
     required this.isCleared,
+    required this.totalRounds,
   });
 
   final int stageId;
@@ -17,6 +18,7 @@ class StageProgress {
   final String? thumbnailUrl;
   final int stageScore;
   final bool isCleared;
+  final int totalRounds;
 }
 
 class StageEnterResult {
@@ -94,13 +96,14 @@ class StageRepository {
         }
 
         result[stageId] = StageProgress(
-        stageId: stageId,
-        title: item['title']?.toString() ?? '제목 없음', 
-        description: item['description']?.toString() ?? '', 
-        thumbnailUrl: item['thumbnail_url']?.toString(), 
-        stageScore: _toInt(item['stage_score']) ?? 0,
-        isCleared: _toBool(item['is_cleared']) ?? false,
-      );
+          stageId: stageId,
+          title: item['title']?.toString() ?? '제목 없음', 
+          description: item['description']?.toString() ?? '', 
+          thumbnailUrl: item['thumbnail_url']?.toString(), 
+          stageScore: _toInt(item['stage_score']) ?? 0,
+          isCleared: _toBool(item['is_cleared']) ?? false,
+          totalRounds: _toInt(item['total_round_count']) ?? 0,
+        );
       }
 
       return result;
@@ -141,6 +144,7 @@ class StageRepository {
 
       final data = _asMap(payload['data']) ?? payload;
       final resolvedStageId = _toInt(data['stage_id']) ?? stageId;
+
       return StageEnterResult(
         progressId: data['progress_id']?.toString(),
         stageId: resolvedStageId,
