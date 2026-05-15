@@ -34,6 +34,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _pendingInitialAiMessage;
   bool _isTyping = false;
   bool _isRoundInitializing = false;
+  String _roundLoadingText = '시나리오를 준비 중입니다...';
   _JudgmentType? _judgmentType;
 
   @override
@@ -55,7 +56,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _prepareRoundAndShowScenarioModal() async {
     if (!mounted || _isRoundInitializing) return;
 
-    setState(() => _isRoundInitializing = true);
+    setState(() {
+      _isRoundInitializing = true;
+      _roundLoadingText = '시나리오를 불러오는 중...';
+    });
 
     final token = await _resolveIdToken();
     if (token == null || token.isEmpty) {
@@ -71,6 +75,12 @@ class _ChatScreenState extends State<ChatScreen> {
         stageId: widget.args.stageId,
         idToken: token,
       );
+
+      if (mounted) {
+        setState(() {
+          _roundLoadingText = 'AI가 첫 메시지를 생성 중입니다...';
+        });
+      }
 
       final fetched = await _chatRepository.fetchMessages(
         roundId: roundResult.roundId,
@@ -602,8 +612,10 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
+            Column(
+              children: [
             Container(
               height: 68,
               padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -790,6 +802,63 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
+              ],
+            ),
+            if (_isRoundInitializing)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.62),
+                  alignment: Alignment.center,
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 28),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 18,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF09131E),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF1E2B3D),
+                        width: 1.1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 30,
+                          height: 30,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.8,
+                            color: Color(0xFF00D64F),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _roundLoadingText,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        const Text(
+                          '잠시만 기다려주세요.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFF94A1AF),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
