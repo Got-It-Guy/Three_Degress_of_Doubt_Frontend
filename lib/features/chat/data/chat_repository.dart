@@ -18,17 +18,8 @@ class ChatMessageDto {
 }
 
 class SendMessageResult {
-  const SendMessageResult({
-    required this.messages,
-    required this.isEvidence,
-    required this.isConversationOver,
-    this.endedReason,
-  });
-
+  const SendMessageResult({required this.messages});
   final List<ChatMessageDto> messages;
-  final bool isEvidence;
-  final bool isConversationOver;
-  final String? endedReason;
 }
 
 class SituationPromptDto {
@@ -64,7 +55,7 @@ class JudgeRoundResult {
     required this.currentScore,
     required this.currentWarning,
     required this.isStageCleared,
-    required this.rawBody,
+    required this.totalRoundCount,
   });
 
   final String result;
@@ -72,35 +63,7 @@ class JudgeRoundResult {
   final int currentScore;
   final int currentWarning;
   final bool isStageCleared;
-  final Map<String, dynamic> rawBody;
-}
-
-class ReportFraudPointDto {
-  const ReportFraudPointDto({
-    required this.messageId,
-    required this.reason,
-    required this.tip,
-  });
-
-  final String? messageId;
-  final String reason;
-  final String tip;
-}
-
-class RoundReportResult {
-  const RoundReportResult({
-    required this.reportId,
-    required this.roundId,
-    required this.reportType,
-    required this.summary,
-    required this.fraudPoints,
-  });
-
-  final String? reportId;
-  final String? roundId;
-  final String reportType;
-  final String summary;
-  final List<ReportFraudPointDto> fraudPoints;
+  final int totalRoundCount;
 }
 
 class RoundReportDto {
@@ -197,12 +160,7 @@ class ChatRepository {
       }
     }
 
-    return SendMessageResult(
-      messages: aiMessages,
-      isEvidence: payload['is_evidence'] == true,
-      isConversationOver: payload['is_conversation_over'] == true,
-      endedReason: payload['ended_reason']?.toString(),
-    );
+    return SendMessageResult(messages: aiMessages);
   }
 
   Future<List<ChatMessageDto>> fetchMessages({
@@ -274,62 +232,7 @@ class ChatRepository {
       currentScore: _toInt(data['current_score']) ?? 0,
       currentWarning: _toInt(data['current_warning']) ?? 0,
       isStageCleared: _toBool(data['is_stage_cleared']) ?? false,
-      rawBody: payload,
-    );
-  }
-
-  Future<RoundReportResult> fetchRoundReport({
-    required String roundId,
-    required String idToken,
-  }) async {
-    final endpoint = _joinUrl(
-      BackendConfig.baseUrl,
-      BackendConfig.reportPathByRoundId(roundId),
-    );
-    final response = await _dio.get<dynamic>(
-      endpoint,
-      options: Options(
-        headers: <String, String>{
-          'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json; charset=utf-8',
-        },
-      ),
-    );
-
-    final payload = _asMap(response.data);
-    if (payload == null) {
-      throw StateError('Report response is not a valid JSON object.');
-    }
-    final status = payload['status']?.toString();
-    if (status != null && status != 'success') {
-      throw StateError('Report response status is not success.');
-    }
-    final data = _asMap(payload['data']) ?? payload;
-
-    final rawFraudPoints = data['fraud_points'];
-    final fraudPoints = <ReportFraudPointDto>[];
-    if (rawFraudPoints is List) {
-      for (final item in rawFraudPoints) {
-        final point = _asMap(item);
-        if (point == null) {
-          continue;
-        }
-        fraudPoints.add(
-          ReportFraudPointDto(
-            messageId: _toIdString(point['message_id']),
-            reason: point['reason']?.toString() ?? '',
-            tip: point['tip']?.toString() ?? '',
-          ),
-        );
-      }
-    }
-
-    return RoundReportResult(
-      reportId: _toIdString(data['report_id']),
-      roundId: _toIdString(data['round_id']),
-      reportType: data['report_type']?.toString() ?? '',
-      summary: data['summary']?.toString() ?? '',
-      fraudPoints: fraudPoints,
+      totalRoundCount: _toInt(data['total_round_count']) ?? 0,
     );
   }
 
@@ -455,61 +358,37 @@ Map<String, dynamic>? _asMap(dynamic payload) {
 }
 
 int? _toInt(dynamic value) {
-  if (value == null) {
-    return null;
-  }
-  if (value is int) {
-    return value;
-  }
-  if (value is num) {
-    return value.toInt();
-  }
-  if (value is String) {
-    return int.tryParse(value);
-  }
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
   return null;
 }
 
 String? _toIdString(dynamic value) {
-  if (value == null) {
-    return null;
-  }
+  if (value == null) return null;
   if (value is String) {
     final text = value.trim();
     return text.isEmpty ? null : text;
   }
-  if (value is num) {
-    return value.toString();
-  }
+  if (value is num) return value.toString();
   final text = value.toString().trim();
   return text.isEmpty ? null : text;
 }
 
 DateTime? _toDateTime(dynamic value) {
-  if (value is String) {
-    return DateTime.tryParse(value)?.toLocal();
-  }
+  if (value is String) return DateTime.tryParse(value)?.toLocal();
   return null;
 }
 
 bool? _toBool(dynamic value) {
-  if (value == null) {
-    return null;
-  }
-  if (value is bool) {
-    return value;
-  }
-  if (value is num) {
-    return value != 0;
-  }
+  if (value == null) return null;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
   if (value is String) {
     final normalized = value.trim().toLowerCase();
-    if (normalized == 'true' || normalized == '1') {
-      return true;
-    }
-    if (normalized == 'false' || normalized == '0') {
-      return false;
-    }
+    if (normalized == 'true' || normalized == '1') return true;
+    if (normalized == 'false' || normalized == '0') return false;
   }
   return null;
 }

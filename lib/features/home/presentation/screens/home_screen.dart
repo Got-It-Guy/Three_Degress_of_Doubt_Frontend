@@ -88,19 +88,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       await AppDependencies.authRepository.syncWithBackend(idToken: token);
-      await AppDependencies.stageRepository.enterStage(
+      final enterResult = await AppDependencies.stageRepository.enterStage(
         stageId: stage.stageId,
         idToken: token,
       );
       if (!mounted) return;
+
+      if (!enterResult.isCleared && (enterResult.stageScore > 0 || enterResult.warningCount > 0)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('이전 진행 상황을 불러옵니다.'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Color(0xFF00D64F),
+          ),
+        );
+      }
+
       await Navigator.pushNamed(
         context,
         '/chat',
         arguments: ChatScreenArgs(
           stageId: stage.stageId,
           stageTitle: stage.title,
+          initialScore: enterResult.stageScore,
+          initialWarning: enterResult.warningCount,
+          initialTotalRounds: enterResult.totalRoundCount,
         ),
       );
+      _loadStageProgress();
     } on Exception catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -444,8 +459,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (isDone) ...[
                       const SizedBox(height: 6),
                       Text(
-                        stage.bestRoundCount == null
-                            ? '아직 기록 없음'
+                        (stage.bestRoundCount == null || stage.bestRoundCount == 0)
+                            ? '기록 계산 중'
                             : '최고 기록: ${stage.bestRoundCount}라운드',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.8),
