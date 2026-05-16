@@ -679,12 +679,21 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (!mounted || !dialogContext.mounted) return;
       Navigator.pop(dialogContext);
-      setState(() => _isConversationOver = true);
       if (judgeResult.result == 'pass') {
+        setState(() => _isConversationOver = true);
         await _completeRoundFlow(token, shouldShowReport: true);
+      } else if (judgeResult.result == 'reset') {
+        setState(() => _isConversationOver = true);
+        _showSnack('경고가 누적되어 점수와 경고가 초기화되었습니다.');
+        await _completeRoundFlow(token, shouldShowReport: true);
+      } else if (judgeResult.result == 'warning') {
+        setState(() => _isConversationOver = false);
+        _showSnack('경고가 누적되었습니다. 현재 라운드를 계속 진행하세요.');
+        _debugLog('/report 호출 스킵 (judge result=warning, 라운드 유지)');
       } else {
+        setState(() => _isConversationOver = false);
         _showSnack('판정 결과: ${judgeResult.result}');
-        await _completeRoundFlow(token, shouldShowReport: false);
+        _debugLog('/report 호출 스킵 (알 수 없는 judge result)');
       }
       return;
     }
