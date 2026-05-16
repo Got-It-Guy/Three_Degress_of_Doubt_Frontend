@@ -41,11 +41,11 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _stages = _baseStages().map((stage) {
           final progress = progressByStageId[stage.stageId];
-          final isCleared = progress?.isCleared ?? false;
           final stageScore = progress?.stageScore ?? 0;
+          final isCleared = (progress?.isCleared ?? false) || stageScore >= 3;
           return stage.copyWith(
             isDone: isCleared,
-            rounds: isCleared ? stageScore : 0,
+            bestRoundCount: progress?.bestRoundCount,
           );
         }).toList();
         _progressError = null;
@@ -280,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.phone_outlined,
         level: '쉬움',
         isDone: false,
-        rounds: 0,
+        bestRoundCount: null,
       ),
       _StageCardData(
         stageId: 2,
@@ -289,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.trending_up,
         level: '보통',
         isDone: false,
-        rounds: 0,
+        bestRoundCount: null,
       ),
       _StageCardData(
         stageId: 3,
@@ -298,7 +298,7 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.domain_outlined,
         level: '어려움',
         isDone: false,
-        rounds: 0,
+        bestRoundCount: null,
       ),
       _StageCardData(
         stageId: 4,
@@ -307,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.account_balance_outlined,
         level: '보통',
         isDone: false,
-        rounds: 0,
+        bestRoundCount: null,
       ),
       _StageCardData(
         stageId: 5,
@@ -316,7 +316,7 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.shopping_bag_outlined,
         level: '쉬움',
         isDone: false,
-        rounds: 0,
+        bestRoundCount: null,
       ),
       _StageCardData(
         stageId: 6,
@@ -325,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.shuffle,
         level: '변동',
         isDone: false,
-        rounds: 0,
+        bestRoundCount: null,
       ),
     ];
   }
@@ -428,23 +428,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     if (isDone) ...[
                       const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.emoji_events_outlined,
-                            color: Colors.white.withValues(alpha: 0.8),
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${stage.rounds}라운드 클리어',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        stage.bestRoundCount == null
+                            ? '아직 기록 없음'
+                            : '최고 기록: ${stage.bestRoundCount}라운드',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ],
@@ -466,7 +458,7 @@ class _StageCardData {
     required this.icon,
     required this.level,
     required this.isDone,
-    required this.rounds,
+    required this.bestRoundCount,
   });
 
   final int stageId;
@@ -475,7 +467,7 @@ class _StageCardData {
   final IconData icon;
   final String level;
   final bool isDone;
-  final int rounds;
+  final int? bestRoundCount;
 
   _StageCardData copyWith({
     int? stageId,
@@ -484,7 +476,7 @@ class _StageCardData {
     IconData? icon,
     String? level,
     bool? isDone,
-    int? rounds,
+    int? bestRoundCount,
   }) {
     return _StageCardData(
       stageId: stageId ?? this.stageId,
@@ -493,7 +485,7 @@ class _StageCardData {
       icon: icon ?? this.icon,
       level: level ?? this.level,
       isDone: isDone ?? this.isDone,
-      rounds: rounds ?? this.rounds,
+      bestRoundCount: bestRoundCount ?? this.bestRoundCount,
     );
   }
 }

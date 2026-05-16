@@ -18,9 +18,15 @@ class ChatMessageDto {
 }
 
 class SendMessageResult {
-  const SendMessageResult({required this.messages});
+  const SendMessageResult({
+    required this.messages,
+    required this.isConversationOver,
+    this.endedReason,
+  });
 
   final List<ChatMessageDto> messages;
+  final bool isConversationOver;
+  final String? endedReason;
 }
 
 class SituationPromptDto {
@@ -143,7 +149,11 @@ class ChatRepository {
       }
     }
 
-    return SendMessageResult(messages: aiMessages);
+    return SendMessageResult(
+      messages: aiMessages,
+      isConversationOver: payload['is_conversation_over'] == true,
+      endedReason: payload['ended_reason']?.toString(),
+    );
   }
 
   Future<List<ChatMessageDto>> fetchMessages({

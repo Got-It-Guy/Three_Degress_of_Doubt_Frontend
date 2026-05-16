@@ -4,10 +4,12 @@ import 'package:three_degress_of_doubt_frontend/core/config/backend_config.dart'
 class StageProgress {
   const StageProgress({
     required this.stageId,
-    required this.title,        
-    required this.description,  
-    this.thumbnailUrl,          
+    required this.title,
+    required this.description,
+    this.thumbnailUrl,
     required this.stageScore,
+    required this.totalRoundCount,
+    required this.bestRoundCount,
     required this.isCleared,
   });
 
@@ -16,6 +18,8 @@ class StageProgress {
   final String description;
   final String? thumbnailUrl;
   final int stageScore;
+  final int totalRoundCount;
+  final int? bestRoundCount;
   final bool isCleared;
 }
 
@@ -94,13 +98,15 @@ class StageRepository {
         }
 
         result[stageId] = StageProgress(
-        stageId: stageId,
-        title: item['title']?.toString() ?? '제목 없음', 
-        description: item['description']?.toString() ?? '', 
-        thumbnailUrl: item['thumbnail_url']?.toString(), 
-        stageScore: _toInt(item['stage_score']) ?? 0,
-        isCleared: _toBool(item['is_cleared']) ?? false,
-      );
+          stageId: stageId,
+          title: item['title']?.toString() ?? '제목 없음',
+          description: item['description']?.toString() ?? '',
+          thumbnailUrl: item['thumbnail_url']?.toString(),
+          stageScore: _toInt(item['stage_score']) ?? 0,
+          totalRoundCount: _toInt(item['total_round_count']) ?? 0,
+          bestRoundCount: _toInt(item['best_round_count']),
+          isCleared: _toBool(item['is_cleared']) ?? false,
+        );
       }
 
       return result;

@@ -34,6 +34,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _pendingInitialAiMessage;
   bool _isTyping = false;
   bool _isRoundInitializing = false;
+  bool _isConversationOver = false;
   String _roundLoadingText = '시나리오를 준비 중입니다...';
   _JudgmentType? _judgmentType;
 
@@ -125,7 +126,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendMessage() async {
     final input = _inputController.text.trim();
-    if (input.isEmpty || _isRoundInitializing) return;
+    if (input.isEmpty || _isRoundInitializing || _isConversationOver) return;
     if (_roundId == null) {
       _showSnack('라운드가 준비되지 않았습니다.');
       return;
@@ -158,10 +159,17 @@ class _ChatScreenState extends State<ChatScreen> {
         idToken: token,
       );
 
-      final fetched = await _chatRepository.fetchMessages(
-        roundId: _roundId!,
-        idToken: token,
-      );
+      List<ChatMessageDto> fetched = const <ChatMessageDto>[];
+      try {
+        fetched = await _chatRepository.fetchMessages(
+          roundId: _roundId!,
+          idToken: token,
+        );
+      } catch (_) {
+        if (!result.isConversationOver) {
+          rethrow;
+        }
+      }
 
       if (!mounted) return;
       final mapped = fetched.map(_fromDto).toList();
@@ -187,11 +195,28 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
       _scrollToBottom();
+
+      if (result.isConversationOver) {
+        setState(() => _isConversationOver = true);
+        await _refreshStagesAndMoveHome(token);
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() => _isTyping = false);
       _showSnack('메시지 전송 중 오류: $error');
     }
+  }
+
+  Future<void> _refreshStagesAndMoveHome(String idToken) async {
+    try {
+      await AppDependencies.stageRepository.fetchStageProgresses(
+        idToken: idToken,
+      );
+    } catch (_) {
+      // best-effort refresh
+    }
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
   }
 
   Future<void> _showScenarioIntroModal() async {
@@ -470,6 +495,11 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _confirmJudgment(BuildContext dialogContext) async {
     final selected = _judgmentType;
     if (selected == null) return;
+    if (_isConversationOver) {
+      Navigator.pop(dialogContext);
+      _showSnack('이미 종료된 라운드입니다.');
+      return;
+    }
 
     if (selected == _JudgmentType.scam) {
       if (_roundId == null) {
@@ -494,7 +524,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (!mounted || !dialogContext.mounted) return;
       Navigator.pop(dialogContext);
-      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+      await _refreshStagesAndMoveHome(token);
       return;
     }
 
@@ -660,7 +690,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                   OutlinedButton.icon(
-                    onPressed: _showJudgmentModal,
+                    onPressed: _isConversationOver ? null : _showJudgmentModal,
                     icon: const Icon(Icons.pause, size: 16),
                     label: const Text('판정'),
                     style: OutlinedButton.styleFrom(
@@ -751,6 +781,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       child: TextField(
                         controller: _inputController,
+                        enabled: !_isConversationOver,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -777,7 +808,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   ListenableBuilder(
                     listenable: _inputController,
                     builder: (context, _) {
-                      final enabled = _inputController.text.trim().isNotEmpty;
+                      final enabled =
+                          !_isConversationOver &&
+                          _inputController.text.trim().isNotEmpty;
                       return Material(
                         color: enabled
                             ? outgoingBubbleColor
