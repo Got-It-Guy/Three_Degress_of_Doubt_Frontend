@@ -5,6 +5,8 @@ class StageModel {
   final String? thumbnailUrl; 
   final bool isRandom;
   final int stageScore;
+  final int totalRoundCount;
+  final int? bestRoundCount;
   final int warningCount;
   final bool isCleared;
 
@@ -15,6 +17,8 @@ class StageModel {
     this.thumbnailUrl,
     required this.isRandom,
     required this.stageScore,
+    required this.totalRoundCount,
+    required this.bestRoundCount,
     required this.warningCount,
     required this.isCleared,
   });
@@ -27,6 +31,8 @@ class StageModel {
       thumbnailUrl: json['thumbnail_url'] as String?,
       isRandom: json['is_random'] as bool,
       stageScore: json['stage_score'] as int,
+      totalRoundCount: (json['total_round_count'] as num?)?.toInt() ?? 0,
+      bestRoundCount: (json['best_round_count'] as num?)?.toInt(),
       warningCount: json['warning_count'] as int,
       isCleared: json['is_cleared'] as bool,
     );
