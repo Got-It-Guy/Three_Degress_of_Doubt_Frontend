@@ -1,40 +1,51 @@
-class StageModel {
+class StageProgress {
   final int stageId;
   final String title;
   final String description;
-  final String? thumbnailUrl; 
-  final bool isRandom;
+  final String? thumbnailUrl;
   final int stageScore;
-  final int totalRoundCount;
-  final int? bestRoundCount;
-  final int warningCount;
   final bool isCleared;
+  final int bestRoundCount;
 
-  StageModel({
+  const StageProgress({
     required this.stageId,
     required this.title,
     required this.description,
     this.thumbnailUrl,
-    required this.isRandom,
     required this.stageScore,
-    required this.totalRoundCount,
-    required this.bestRoundCount,
-    required this.warningCount,
     required this.isCleared,
+    this.bestRoundCount = 0,
   });
 
-  factory StageModel.fromJson(Map<String, dynamic> json) {
-    return StageModel(
+  factory StageProgress.fromJson(Map<String, dynamic> json) {
+    return StageProgress(
       stageId: json['stage_id'] as int,
-      title: json['title'] as String,
-      description: json['description'] as String,
-      thumbnailUrl: json['thumbnail_url'] as String?,
-      isRandom: json['is_random'] as bool,
-      stageScore: json['stage_score'] as int,
-      totalRoundCount: (json['total_round_count'] as num?)?.toInt() ?? 0,
-      bestRoundCount: (json['best_round_count'] as num?)?.toInt(),
-      warningCount: json['warning_count'] as int,
-      isCleared: json['is_cleared'] as bool,
+      title: json['title']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      thumbnailUrl: json['thumbnail_url']?.toString(),
+      stageScore: json['stage_score'] as int? ?? 0,
+      isCleared: json['is_cleared'] as bool? ?? false,
+      bestRoundCount: json['best_round_count'] as int? ?? 0,
+    );
+  }
+
+  StageProgress copyWith({
+    int? stageId,
+    String? title,
+    String? description,
+    String? thumbnailUrl,
+    int? stageScore,
+    bool? isCleared,
+    int? bestRoundCount,
+  }) {
+    return StageProgress(
+      stageId: stageId ?? this.stageId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      stageScore: stageScore ?? this.stageScore,
+      isCleared: isCleared ?? this.isCleared,
+      bestRoundCount: bestRoundCount ?? this.bestRoundCount,
     );
   }
 }
