@@ -656,10 +656,6 @@ class _ChatScreenState extends State<ChatScreen> {
         _showSnack('먼저 메시지를 1회 이상 전송해 주세요.');
         return;
       }
-      if (_lastMessageIsEvidence != true) {
-        _showSnack('현재 라운드는 아직 사기 근거가 확인되지 않았습니다.');
-        return;
-      }
       final token = await _resolveIdToken();
       if (token == null || token.isEmpty) {
         _showSnack('인증 토큰을 확인할 수 없습니다.');
