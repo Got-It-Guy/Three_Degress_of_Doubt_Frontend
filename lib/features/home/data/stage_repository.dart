@@ -11,7 +11,6 @@ class StageProgress {
     required this.totalRoundCount,
     required this.bestRoundCount,
     required this.isCleared,
-    required this.totalRounds,
   });
 
   final int stageId;
@@ -22,7 +21,6 @@ class StageProgress {
   final int totalRoundCount;
   final int? bestRoundCount;
   final bool isCleared;
-  final int totalRounds;
 }
 
 class StageEnterResult {
