@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 import 'package:three_degress_of_doubt_frontend/features/chat/data/chat_repository.dart';
@@ -36,6 +37,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isTyping = false;
   bool _isRoundInitializing = false;
   bool _isConversationOver = false;
+  bool _hasPostedUserMessage = false;
+  bool? _lastMessageIsEvidence;
   String _roundLoadingText = '시나리오를 준비 중입니다...';
   _JudgmentType? _judgmentType;
 
@@ -114,6 +117,8 @@ class _ChatScreenState extends State<ChatScreen> {
               ? _scenarioIntroData.scenarioSummary
               : promptSummary,
         );
+        _hasPostedUserMessage = false;
+        _lastMessageIsEvidence = null;
         _isRoundInitializing = false;
       });
 
@@ -154,11 +159,15 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
+      _debugLog('round_id=$_roundId /messages POST called=true');
       final result = await _chatRepository.sendMessage(
         roundId: _roundId!,
         content: input,
         idToken: token,
       );
+      _debugLog('/messages response is_evidence=${result.isEvidence}');
+      _hasPostedUserMessage = true;
+      _lastMessageIsEvidence = result.isEvidence;
 
       List<ChatMessageDto> fetched = const <ChatMessageDto>[];
       try {
@@ -199,7 +208,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (result.isConversationOver) {
         setState(() => _isConversationOver = true);
-        await _completeRoundFlow(token);
+        await _completeRoundFlow(token, shouldShowReport: false);
       }
     } catch (error) {
       if (!mounted) return;
@@ -237,14 +246,23 @@ class _ChatScreenState extends State<ChatScreen> {
       _pendingInitialAiMessageId = null;
       _pendingInitialAiMessage = null;
       _isConversationOver = false;
+      _hasPostedUserMessage = false;
+      _lastMessageIsEvidence = null;
       _isTyping = false;
     });
 
     await _prepareRoundAndShowScenarioModal();
   }
 
-  Future<void> _completeRoundFlow(String idToken) async {
-    await _showRoundReportModal(idToken);
+  Future<void> _completeRoundFlow(
+    String idToken, {
+    required bool shouldShowReport,
+  }) async {
+    if (shouldShowReport) {
+      await _showRoundReportModal(idToken);
+    } else {
+      _debugLog('/report 호출 스킵 (조건 미충족)');
+    }
     if (!mounted) {
       return;
     }
@@ -256,6 +274,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (roundId == null) {
       return;
     }
+    _debugLog('/report 호출 시점: round_id=$roundId');
 
     RoundReportResult report;
     try {
@@ -630,13 +649,27 @@ class _ChatScreenState extends State<ChatScreen> {
         _showSnack('라운드 정보가 없습니다.');
         return;
       }
+      _debugLog('round_id=$_roundId');
+      _debugLog('/messages POST called 여부=$_hasPostedUserMessage');
+      _debugLog('/messages 응답 is_evidence=$_lastMessageIsEvidence');
+      if (!_hasPostedUserMessage) {
+        _showSnack('먼저 메시지를 1회 이상 전송해 주세요.');
+        return;
+      }
+      if (_lastMessageIsEvidence != true) {
+        _showSnack('현재 라운드는 아직 사기 근거가 확인되지 않았습니다.');
+        return;
+      }
       final token = await _resolveIdToken();
       if (token == null || token.isEmpty) {
         _showSnack('인증 토큰을 확인할 수 없습니다.');
         return;
       }
+      const judgeBody = <String, dynamic>{'is_fraud_judged': true};
+      _debugLog('/judge 요청 body=$judgeBody');
+      late final JudgeRoundResult judgeResult;
       try {
-        await _chatRepository.judgeRound(
+        judgeResult = await _chatRepository.judgeRound(
           roundId: _roundId!,
           isFraudJudged: true,
           idToken: token,
@@ -645,11 +678,18 @@ class _ChatScreenState extends State<ChatScreen> {
         _showSnack('판정 제출 실패: $error');
         return;
       }
+      _debugLog('/judge 응답 result=${judgeResult.result}');
+      _debugLog('/judge 응답 전체 body=${judgeResult.rawBody}');
 
       if (!mounted || !dialogContext.mounted) return;
       Navigator.pop(dialogContext);
       setState(() => _isConversationOver = true);
-      await _completeRoundFlow(token);
+      if (judgeResult.result == 'pass') {
+        await _completeRoundFlow(token, shouldShowReport: true);
+      } else {
+        _showSnack('판정 결과: ${judgeResult.result}');
+        await _completeRoundFlow(token, shouldShowReport: false);
+      }
       return;
     }
 
@@ -754,6 +794,13 @@ class _ChatScreenState extends State<ChatScreen> {
   void _showSnack(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  void _debugLog(String message) {
+    if (!kDebugMode) {
+      return;
+    }
+    debugPrint('[RoundDebug] $message');
   }
 
   @override

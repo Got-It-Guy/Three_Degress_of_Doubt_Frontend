@@ -20,11 +20,13 @@ class ChatMessageDto {
 class SendMessageResult {
   const SendMessageResult({
     required this.messages,
+    required this.isEvidence,
     required this.isConversationOver,
     this.endedReason,
   });
 
   final List<ChatMessageDto> messages;
+  final bool isEvidence;
   final bool isConversationOver;
   final String? endedReason;
 }
@@ -62,6 +64,7 @@ class JudgeRoundResult {
     required this.currentScore,
     required this.currentWarning,
     required this.isStageCleared,
+    required this.rawBody,
   });
 
   final String result;
@@ -69,6 +72,7 @@ class JudgeRoundResult {
   final int currentScore;
   final int currentWarning;
   final bool isStageCleared;
+  final Map<String, dynamic> rawBody;
 }
 
 class ReportFraudPointDto {
@@ -179,6 +183,7 @@ class ChatRepository {
 
     return SendMessageResult(
       messages: aiMessages,
+      isEvidence: payload['is_evidence'] == true,
       isConversationOver: payload['is_conversation_over'] == true,
       endedReason: payload['ended_reason']?.toString(),
     );
@@ -253,6 +258,7 @@ class ChatRepository {
       currentScore: _toInt(data['current_score']) ?? 0,
       currentWarning: _toInt(data['current_warning']) ?? 0,
       isStageCleared: _toBool(data['is_stage_cleared']) ?? false,
+      rawBody: payload,
     );
   }
 
