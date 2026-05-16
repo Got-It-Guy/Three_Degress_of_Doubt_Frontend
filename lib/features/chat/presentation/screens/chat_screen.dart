@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 import 'package:three_degress_of_doubt_frontend/features/chat/data/chat_repository.dart';
+import 'package:three_degress_of_doubt_frontend/features/home/data/stage_repository.dart';
 
 class ChatScreenArgs {
   const ChatScreenArgs({required this.stageId, required this.stageTitle});
@@ -198,7 +199,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (result.isConversationOver) {
         setState(() => _isConversationOver = true);
-        await _refreshStagesAndMoveHome(token);
+        await _completeRoundFlow(token);
       }
     } catch (error) {
       if (!mounted) return;
@@ -207,16 +208,139 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _refreshStagesAndMoveHome(String idToken) async {
+  Future<void> _handleRoundCompletion(String idToken) async {
+    Map<int, StageProgress> progresses;
     try {
-      await AppDependencies.stageRepository.fetchStageProgresses(
+      progresses = await AppDependencies.stageRepository.fetchStageProgresses(
+        idToken: idToken,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showSnack('스테이지 정보 재조회 실패: $error');
+      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+      return;
+    }
+
+    final current = progresses[widget.args.stageId];
+    final stageScore = current?.stageScore ?? 0;
+    final isCleared = (current?.isCleared ?? false) || stageScore >= 3;
+    if (!mounted) return;
+
+    if (isCleared) {
+      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+      return;
+    }
+
+    setState(() {
+      _messages.clear();
+      _roundId = null;
+      _pendingInitialAiMessageId = null;
+      _pendingInitialAiMessage = null;
+      _isConversationOver = false;
+      _isTyping = false;
+    });
+
+    await _prepareRoundAndShowScenarioModal();
+  }
+
+  Future<void> _completeRoundFlow(String idToken) async {
+    await _showRoundReportModal(idToken);
+    if (!mounted) {
+      return;
+    }
+    await _handleRoundCompletion(idToken);
+  }
+
+  Future<void> _showRoundReportModal(String idToken) async {
+    final roundId = _roundId;
+    if (roundId == null) {
+      return;
+    }
+
+    RoundReportResult report;
+    try {
+      report = await _chatRepository.fetchRoundReport(
+        roundId: roundId,
         idToken: idToken,
       );
     } catch (_) {
-      // best-effort refresh
+      return;
     }
-    if (!mounted) return;
-    Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+    if (!mounted) {
+      return;
+    }
+
+    final firstPoint = report.fraudPoints.isNotEmpty
+        ? report.fraudPoints.first
+        : null;
+    final reason = firstPoint?.reason.trim().isNotEmpty == true
+        ? firstPoint!.reason.trim()
+        : report.summary.trim();
+    final tip = firstPoint?.tip.trim() ?? '';
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.62),
+      builder: (dialogContext) {
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF09131E),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFF1E2B3D), width: 1.1),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '라운드 결과',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _buildIntroSection(
+                  '판정 이유',
+                  reason.isEmpty ? '분석 결과를 생성하지 못했습니다.' : reason,
+                ),
+                const SizedBox(height: 10),
+                _buildIntroSection(
+                  '대응 팁',
+                  tip.isEmpty ? '추가 대응 팁이 없습니다.' : tip,
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0B7A33),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    child: const Text('확인'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _showScenarioIntroModal() async {
@@ -524,7 +648,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (!mounted || !dialogContext.mounted) return;
       Navigator.pop(dialogContext);
-      await _refreshStagesAndMoveHome(token);
+      setState(() => _isConversationOver = true);
+      await _completeRoundFlow(token);
       return;
     }
 

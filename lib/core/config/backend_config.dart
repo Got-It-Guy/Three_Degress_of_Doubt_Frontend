@@ -60,6 +60,11 @@ class BackendConfig {
   static String judgePathByRoundId(String roundId) {
     return '/api/v1/rounds/$roundId/judge';
   }
+
+  static String reportPathByRoundId(String roundId) {
+    return '/api/v1/rounds/$roundId/report';
+  }
+
   static Duration? get connectTimeout {
     return _readOptionalDuration('BACKEND_CONNECT_TIMEOUT_SEC');
   }

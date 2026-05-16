@@ -71,6 +71,34 @@ class JudgeRoundResult {
   final bool isStageCleared;
 }
 
+class ReportFraudPointDto {
+  const ReportFraudPointDto({
+    required this.messageId,
+    required this.reason,
+    required this.tip,
+  });
+
+  final String? messageId;
+  final String reason;
+  final String tip;
+}
+
+class RoundReportResult {
+  const RoundReportResult({
+    required this.reportId,
+    required this.roundId,
+    required this.reportType,
+    required this.summary,
+    required this.fraudPoints,
+  });
+
+  final String? reportId;
+  final String? roundId;
+  final String reportType;
+  final String summary;
+  final List<ReportFraudPointDto> fraudPoints;
+}
+
 class ChatRepository {
   ChatRepository({required Dio dio}) : _dio = dio;
 
@@ -225,6 +253,61 @@ class ChatRepository {
       currentScore: _toInt(data['current_score']) ?? 0,
       currentWarning: _toInt(data['current_warning']) ?? 0,
       isStageCleared: _toBool(data['is_stage_cleared']) ?? false,
+    );
+  }
+
+  Future<RoundReportResult> fetchRoundReport({
+    required String roundId,
+    required String idToken,
+  }) async {
+    final endpoint = _joinUrl(
+      BackendConfig.baseUrl,
+      BackendConfig.reportPathByRoundId(roundId),
+    );
+    final response = await _dio.get<dynamic>(
+      endpoint,
+      options: Options(
+        headers: <String, String>{
+          'Authorization': 'Bearer $idToken',
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+      ),
+    );
+
+    final payload = _asMap(response.data);
+    if (payload == null) {
+      throw StateError('Report response is not a valid JSON object.');
+    }
+    final status = payload['status']?.toString();
+    if (status != null && status != 'success') {
+      throw StateError('Report response status is not success.');
+    }
+    final data = _asMap(payload['data']) ?? payload;
+
+    final rawFraudPoints = data['fraud_points'];
+    final fraudPoints = <ReportFraudPointDto>[];
+    if (rawFraudPoints is List) {
+      for (final item in rawFraudPoints) {
+        final point = _asMap(item);
+        if (point == null) {
+          continue;
+        }
+        fraudPoints.add(
+          ReportFraudPointDto(
+            messageId: _toIdString(point['message_id']),
+            reason: point['reason']?.toString() ?? '',
+            tip: point['tip']?.toString() ?? '',
+          ),
+        );
+      }
+    }
+
+    return RoundReportResult(
+      reportId: _toIdString(data['report_id']),
+      roundId: _toIdString(data['round_id']),
+      reportType: data['report_type']?.toString() ?? '',
+      summary: data['summary']?.toString() ?? '',
+      fraudPoints: fraudPoints,
     );
   }
 
