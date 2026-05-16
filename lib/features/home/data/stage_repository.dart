@@ -11,6 +11,7 @@ class StageProgress {
     required this.totalRoundCount,
     required this.bestRoundCount,
     required this.isCleared,
+    required this.totalRounds,
   });
 
   final int stageId;
@@ -21,6 +22,7 @@ class StageProgress {
   final int totalRoundCount;
   final int? bestRoundCount;
   final bool isCleared;
+  final int totalRounds;
 }
 
 class StageEnterResult {
@@ -147,6 +149,7 @@ class StageRepository {
 
       final data = _asMap(payload['data']) ?? payload;
       final resolvedStageId = _toInt(data['stage_id']) ?? stageId;
+
       return StageEnterResult(
         progressId: data['progress_id']?.toString(),
         stageId: resolvedStageId,

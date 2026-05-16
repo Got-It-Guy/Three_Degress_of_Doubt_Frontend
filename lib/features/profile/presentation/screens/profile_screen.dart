@@ -21,10 +21,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _profileErrorMessage;
   bool _isSigningOut = false;
 
-  int stageCount = 5;
-  int totalRounds = 12;
-  int attendanceDays = 3;
-
   @override
   void initState() {
     super.initState();
@@ -107,12 +103,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (authEmail != null && authEmail.isNotEmpty) return authEmail;
 
     return '이메일 정보 없음';
-  }
-
-  String _getBadgeTitle(int level) {
-    if (level >= 4) return "전설의 수호자";
-    if (level >= 2) return "중급 수호자";
-    return "초급 수호자";
   }
 
   String _mapProfileError(Object error) {
@@ -232,14 +222,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 32.0),
+                      padding: const EdgeInsets.only(top: 48.0, bottom: 40.0),
                       child: Column(
                         children: [
                           _buildProfileAvatar(
                             primaryGreen: primaryGreen,
                             borderColor: borderColor,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           Text(
                             _isLoadingProfile ? '불러오는 중...' : _displayNickname,
                             style: const TextStyle(
@@ -248,7 +238,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           Text(
                             _isLoadingProfile
                                 ? '프로필 정보를 가져오는 중입니다'
@@ -259,12 +249,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           if (_profileErrorMessage != null) ...[
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 12),
                             Text(
                               _profileErrorMessage!,
                               style: const TextStyle(
                                 color: Color(0xFFFF6D6D),
-                                fontSize: 12,
+                                fontSize: 13,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -279,61 +269,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               child: const Text('다시 시도'),
                             ),
                           ],
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _buildBadge(
-                                'Lv. $stageCount',
-                                primaryGreen.withAlpha(50),
-                                primaryGreen,
-                              ),
-                              const SizedBox(width: 8),
-                              _buildBadge(
-                                _getBadgeTitle(stageCount),
-                                borderColor,
-                                subtitleColor,
-                              ),
-                            ],
-                          ),
                         ],
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: cardColor,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildStatItem(
-                              '완료 스테이지',
-                              '$stageCount',
-                              Icons.grid_view_rounded,
-                              primaryGreen,
-                            ),
-                            _buildStatItem(
-                              '진행 라운드',
-                              '$totalRounds',
-                              Icons.play_circle_outline,
-                              primaryGreen,
-                            ),
-                            _buildStatItem(
-                              '접속 일수',
-                              '$attendanceDays일',
-                              Icons.calendar_today_outlined,
-                              primaryGreen,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20.0),
                       child: Container(
@@ -416,61 +354,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildBadge(String label, Color bgColor, Color textColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: textColor,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem(
-    String label,
-    String value,
-    IconData icon,
-    Color primaryGreen,
-  ) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1C2835),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: primaryGreen, size: 20),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF9AA4B2),
-            fontSize: 11,
-          ),
-        ),
-      ],
     );
   }
 

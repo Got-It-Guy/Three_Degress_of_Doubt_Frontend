@@ -103,6 +103,22 @@ class RoundReportResult {
   final List<ReportFraudPointDto> fraudPoints;
 }
 
+class RoundReportDto {
+  const RoundReportDto({
+    required this.reportId,
+    required this.roundId,
+    required this.reportType,
+    required this.summary,
+    required this.fraudPoints,
+  });
+
+  final String reportId;
+  final String roundId;
+  final String reportType;
+  final String summary;
+  final List<Map<String, dynamic>> fraudPoints;
+}
+
 class ChatRepository {
   ChatRepository({required Dio dio}) : _dio = dio;
 
@@ -314,6 +330,51 @@ class ChatRepository {
       reportType: data['report_type']?.toString() ?? '',
       summary: data['summary']?.toString() ?? '',
       fraudPoints: fraudPoints,
+    );
+  }
+
+  Future<RoundReportDto> fetchReport({
+    required String roundId,
+    required String idToken,
+  }) async {
+    final endpoint = _joinUrl(
+      BackendConfig.baseUrl,
+      '/api/v1/rounds/$roundId/report',
+    );
+
+    final response = await _dio.get<dynamic>(
+      endpoint,
+      options: Options(
+        headers: <String, String>{
+          'Authorization': 'Bearer $idToken',
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+      ),
+    );
+
+    final payload = _asMap(response.data);
+    if (payload == null) {
+      throw StateError('Report response is not a valid JSON object.');
+    }
+
+    final fraudPointsRaw = payload['fraud_points'];
+    final fraudPointsList = <Map<String, dynamic>>[];
+    
+    if (fraudPointsRaw is List) {
+      for (final item in fraudPointsRaw) {
+        final parsedItem = _asMap(item);
+        if (parsedItem != null) {
+          fraudPointsList.add(parsedItem);
+        }
+      }
+    }
+
+    return RoundReportDto(
+      reportId: payload['report_id']?.toString() ?? '',
+      roundId: payload['round_id']?.toString() ?? '',
+      reportType: payload['report_type']?.toString() ?? '',
+      summary: payload['summary']?.toString() ?? '',
+      fraudPoints: fraudPointsList,
     );
   }
 

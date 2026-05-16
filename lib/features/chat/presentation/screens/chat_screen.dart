@@ -34,6 +34,11 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _roundId;
   String? _pendingInitialAiMessageId;
   String? _pendingInitialAiMessage;
+  
+  int _currentScore = 0;
+  int _currentWarning = 0;
+  int _totalRoundsPlayed = 0; 
+
   bool _isTyping = false;
   bool _isRoundInitializing = false;
   bool _isConversationOver = false;
@@ -64,6 +69,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _isRoundInitializing = true;
       _roundLoadingText = '시나리오를 불러오는 중...';
+      _messages.clear();
     });
 
     final token = await _resolveIdToken();
@@ -144,10 +150,12 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
+    final tempId = 'temp-${DateTime.now().microsecondsSinceEpoch}';
+
     setState(() {
       _messages.add(
         _ChatMessage(
-          id: 'user-${DateTime.now().microsecondsSinceEpoch}',
+          id: tempId,
           text: input,
           isUser: true,
           timestamp: DateTime.now(),
@@ -183,11 +191,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (!mounted) return;
       final mapped = fetched.map(_fromDto).toList();
+      
       if (mapped.isNotEmpty) {
         setState(() {
-          _messages
-            ..clear()
-            ..addAll(mapped);
+          _messages.removeWhere((m) => m.id.startsWith('temp-'));
+          
+          for (var newMessage in mapped) {
+            if (!_messages.any((m) => m.id == newMessage.id)) {
+              _messages.add(newMessage);
+            }
+          }
           _isTyping = false;
         });
       } else {
@@ -212,7 +225,9 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _isTyping = false);
+      setState(() {
+        _isTyping = false;
+      });
       _showSnack('메시지 전송 중 오류: $error');
     }
   }
@@ -363,6 +378,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _showScenarioIntroModal() async {
+    final aiName = _scenarioIntroData.counterpartInfo; 
+
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -383,7 +400,7 @@ class _ChatScreenState extends State<ChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _scenarioIntroData.title,
+                  _scenarioIntroData.title, 
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
@@ -391,9 +408,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                _buildIntroSection('상대방 정보', _scenarioIntroData.counterpartInfo),
-                const SizedBox(height: 10),
-                _buildIntroSection('시나리오 설명', _scenarioIntroData.scenarioSummary),
+                
+                _buildIntroSection('수신 정보', '$aiName에게서 메시지가 도착했습니다.'),
+                
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
@@ -401,7 +418,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.pop(dialogContext);
-                      _appendInitialAiMessage();
+                      _appendInitialAiMessage(); 
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0B7A33),
@@ -409,12 +426,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
                     ),
-                    child: const Text('확인'),
+                    child: const Text('대화 확인하기', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                   ),
                 ),
               ],
@@ -597,7 +610,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         const SizedBox(width: 10),
                         buildChoice(
                           type: _JudgmentType.unknown,
-                          label: '모름',
+                          label: '모름/정상',
                           icon: Icons.gpp_maybe_outlined,
                         ),
                       ],
@@ -622,7 +635,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        child: const Text('확인'),
+                        child: const Text('판정하기'),
                       ),
                     ),
                   ],
@@ -670,9 +683,6 @@ class _ChatScreenState extends State<ChatScreen> {
           isFraudJudged: true,
           idToken: token,
         );
-      } catch (error) {
-        _showSnack('판정 제출 실패: $error');
-        return;
       }
       _debugLog('/judge 응답 result=${judgeResult.result}');
       _debugLog('/judge 응답 전체 body=${judgeResult.rawBody}');
@@ -698,7 +708,153 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    Navigator.pop(dialogContext);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF09131E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF1E2B3D), width: 1.1),
+          ),
+          title: Text(
+            title,
+            style: TextStyle(
+              color: titleColor,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  report.summary,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    height: 1.4,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (report.fraudPoints.isNotEmpty) ...[
+                  const Text(
+                    "💡 주요 탐지 포인트",
+                    style: TextStyle(
+                      color: Color(0xFF00D64F),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "• ${report.fraudPoints[0]['reason']}",
+                    style: const TextStyle(
+                      color: Color(0xFFA6B1BD),
+                      fontSize: 13,
+                      height: 1.3,
+                    ),
+                  ),
+                  if (report.fraudPoints[0]['tip'] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Text(
+                        "Tip: ${report.fraudPoints[0]['tip']}",
+                        style: const TextStyle(
+                          color: Color(0xFF8A98A8),
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                ]
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _prepareRoundAndShowScenarioModal(); 
+              },
+              child: const Text(
+                "다음 대화 진행",
+                style: TextStyle(
+                  color: Color(0xFF00D64F),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showStageClearDialog(RoundReportDto report) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF09131E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF00D64F), width: 1.5),
+          ),
+          title: const Text(
+            "🎉 스테이지 클리어!",
+            style: TextStyle(
+              color: Colors.yellowAccent,
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '총 소요 라운드: $_totalRoundsPlayed',
+                style: const TextStyle(
+                  color: Color(0xFF00D64F),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                report.summary,
+                style: const TextStyle(
+                  color: Colors.white,
+                  height: 1.4,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0B7A33),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text("홈으로 돌아가기"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<String?> _resolveIdToken() async {
@@ -823,45 +979,23 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             Column(
               children: [
-            Container(
-              height: 68,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: const BoxDecoration(
-                color: headerColor,
-                border: Border(
-                  bottom: BorderSide(color: borderColor, width: 1),
-                ),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new,
-                      color: Colors.white,
-                      size: 18,
+                Container(
+                  height: 68,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: const BoxDecoration(
+                    color: headerColor,
+                    border: Border(
+                      bottom: BorderSide(color: borderColor, width: 1),
                     ),
                   ),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.args.stageTitle,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          '상대방과 대화 중',
-                          style: TextStyle(
-                            color: Color(0xFF94A1AF),
-                            fontSize: 14,
-                          ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new,
+                          color: Colors.white,
+                          size: 18,
                         ),
                       ],
                     ),
@@ -907,54 +1041,30 @@ class _ChatScreenState extends State<ChatScreen> {
                       constraints: BoxConstraints(
                         maxWidth: MediaQuery.of(context).size.width * 0.74,
                       ),
-                      decoration: BoxDecoration(
-                        color: isUser ? outgoingBubbleColor : incomingBubbleColor,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            message.text,
-                            style: TextStyle(
-                              color: isUser ? const Color(0xFF04330A) : Colors.white,
-                              fontSize: 15,
-                              height: 1.35,
-                              fontWeight: FontWeight.w500,
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.args.stageTitle,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            _timeLabel(message.timestamp),
-                            style: TextStyle(
-                              color: isUser
-                                  ? const Color(0xFF0F6620)
-                                  : const Color(0xFF8A98A8),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
+                            const SizedBox(height: 3),
+                            Text(
+                              '진행도: $_currentScore/3 | 경고: $_currentWarning/2',
+                              style: const TextStyle(
+                                color: outgoingBubbleColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            Container(
-              decoration: const BoxDecoration(
-                color: headerColor,
-                border: Border(top: BorderSide(color: borderColor, width: 1)),
-              ),
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF151F2A),
-                        borderRadius: BorderRadius.circular(24),
+                          ],
+                        ),
                       ),
                       child: TextField(
                         controller: _inputController,
@@ -964,22 +1074,67 @@ class _ChatScreenState extends State<ChatScreen> {
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
-                        onSubmitted: (_) => _sendMessage(),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+                    itemCount: _messages.length + (_isTyping ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (_isTyping && index == _messages.length) {
+                        return const _TypingIndicator();
+                      }
+                      final message = _messages[index];
+                      final isUser = message.isUser;
+
+                      return Align(
+                        alignment: isUser
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
                             vertical: 10,
                           ),
-                          hintText: '메시지를 입력하세요...',
-                          hintStyle: TextStyle(
-                            color: Color(0xFF6B7888),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.74,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isUser ? outgoingBubbleColor : incomingBubbleColor,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                message.text,
+                                style: TextStyle(
+                                  color: isUser ? const Color(0xFF04330A) : Colors.white,
+                                  fontSize: 15,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _timeLabel(message.timestamp),
+                                style: TextStyle(
+                                  color: isUser
+                                      ? const Color(0xFF0F6620)
+                                      : const Color(0xFF8A98A8),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                   const SizedBox(width: 10),
                   ListenableBuilder(
@@ -1006,12 +1161,36 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                           ),
                         ),
-                      );
-                    },
+                      ),
+                      const SizedBox(width: 10),
+                      ListenableBuilder(
+                        listenable: _inputController,
+                        builder: (context, _) {
+                          final enabled = _inputController.text.trim().isNotEmpty;
+                          return Material(
+                            color: enabled
+                                ? outgoingBubbleColor
+                                : outgoingBubbleColor.withValues(alpha: 0.45),
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: enabled ? _sendMessage : null,
+                              child: const SizedBox(
+                                width: 46,
+                                height: 46,
+                                child: Icon(
+                                  Icons.send_rounded,
+                                  color: Color(0xFF04330A),
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
               ],
             ),
             if (_isRoundInitializing)
