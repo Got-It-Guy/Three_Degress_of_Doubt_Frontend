@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 import 'package:three_degress_of_doubt_frontend/features/chat/presentation/screens/chat_screen.dart';
+import 'package:three_degress_of_doubt_frontend/features/home/domain/models/stage_model.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -36,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final progressByStageId = await AppDependencies.stageRepository
           .fetchStageProgresses(idToken: idToken);
+      _debugLogStagesApiResult(progressByStageId);
           
       if (!mounted) return;
 
@@ -60,6 +65,30 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoadingProgress = false;
       });
     }
+  }
+
+  void _debugLogStagesApiResult(Map<int, StageProgress> progressByStageId) {
+    if (!kDebugMode) return;
+
+    final stages = progressByStageId.values.map((progress) {
+      return <String, dynamic>{
+        'stage_id': progress.stageId,
+        'title': progress.title,
+        'description': progress.description,
+        'thumbnail_url': progress.thumbnailUrl,
+        'stage_score': progress.stageScore,
+        'warning_count': progress.warningCount,
+        'best_round_count': progress.bestRoundCount,
+        'is_cleared': progress.isCleared,
+      };
+    }).toList()
+      ..sort((a, b) => (a['stage_id'] as int).compareTo(b['stage_id'] as int));
+
+    final payload = <String, dynamic>{'status': 'success', 'stages': stages};
+    debugPrint(
+      '[HomeStagesAPI] GET /api/v1/stages response=\n'
+      '${const JsonEncoder.withIndent('  ').convert(payload)}',
+    );
   }
 
   Future<String?> _resolveIdToken() async {
