@@ -246,7 +246,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final current = progresses[widget.args.stageId];
     final stageScore = current?.stageScore ?? 0;
-    final isCleared = (current?.isCleared ?? false) || stageScore >= 3;
+    final isCleared = stageScore >= 3;
     if (!mounted) return;
 
     if (isCleared) {
