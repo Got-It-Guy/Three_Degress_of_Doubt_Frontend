@@ -1,9 +1,11 @@
 import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:three_degress_of_doubt_frontend/core/di/app_dependencies.dart';
 import 'package:three_degress_of_doubt_frontend/features/chat/data/chat_repository.dart';
+import 'package:three_degress_of_doubt_frontend/features/home/domain/models/stage_model.dart';
 
 class ChatScreenArgs {
   const ChatScreenArgs({
@@ -41,13 +43,15 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _roundId;
   String? _pendingInitialAiMessageId;
   String? _pendingInitialAiMessage;
-  
-  late int _currentScore;
-  late int _currentWarning;
-  late int _totalRoundsPlayed; 
+
+  int _currentScore = 0;
+  int _currentWarning = 0;
 
   bool _isTyping = false;
   bool _isRoundInitializing = false;
+  bool _isConversationOver = false;
+  bool _hasPostedUserMessage = false;
+  bool? _lastMessageIsEvidence;
   String _roundLoadingText = '시나리오를 준비 중입니다...';
   _JudgmentType? _judgmentType;
 
@@ -56,8 +60,6 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _currentScore = widget.args.initialScore;
     _currentWarning = widget.args.initialWarning;
-    _totalRoundsPlayed = widget.args.initialTotalRounds;
-    
     _scenarioIntroData = _scenarioDataByStageId(widget.args.stageId);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _prepareRoundAndShowScenarioModal();
@@ -89,6 +91,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     try {
+      debugPrint('[StageFlow] enter->rounds, stage_id=${widget.args.stageId}');
       final roundResult = await _chatRepository.createRound(
         stageId: widget.args.stageId,
         idToken: token,
@@ -130,6 +133,8 @@ class _ChatScreenState extends State<ChatScreen> {
               ? _scenarioIntroData.scenarioSummary
               : promptSummary,
         );
+        _hasPostedUserMessage = false;
+        _lastMessageIsEvidence = null;
         _isRoundInitializing = false;
       });
 
@@ -143,7 +148,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendMessage() async {
     final input = _inputController.text.trim();
-    if (input.isEmpty || _isRoundInitializing) return;
+    if (input.isEmpty || _isRoundInitializing || _isConversationOver) return;
     if (_roundId == null) {
       _showSnack('라운드가 준비되지 않았습니다.');
       return;
@@ -172,16 +177,27 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
+      _debugLog('round_id=$_roundId /messages POST called=true');
       final result = await _chatRepository.sendMessage(
         roundId: _roundId!,
         content: input,
         idToken: token,
       );
+      _debugLog('/messages response is_evidence=${result.isEvidence}');
+      _hasPostedUserMessage = true;
+      _lastMessageIsEvidence = result.isEvidence;
 
-      final fetched = await _chatRepository.fetchMessages(
-        roundId: _roundId!,
-        idToken: token,
-      );
+      List<ChatMessageDto> fetched = const <ChatMessageDto>[];
+      try {
+        fetched = await _chatRepository.fetchMessages(
+          roundId: _roundId!,
+          idToken: token,
+        );
+      } catch (_) {
+        if (!result.isConversationOver) {
+          rethrow;
+        }
+      }
 
       if (!mounted) return;
       final mapped = fetched.map(_fromDto).toList();
@@ -212,6 +228,11 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
       _scrollToBottom();
+
+      if (result.isConversationOver) {
+        setState(() => _isConversationOver = true);
+        await _completeRoundFlow(token, shouldShowReport: false);
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -221,15 +242,22 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _onJudgmentButtonPressed() {
-    if (_messages.where((m) => m.isUser).isEmpty) {
-      _showSnack('최소 1회 이상 대화를 진행해야 판정할 수 있습니다.');
+  Future<void> _handleRoundCompletion(String idToken) async {
+    Map<int, StageProgress> progresses;
+    try {
+      progresses = await AppDependencies.stageRepository.fetchStageProgresses(
+        idToken: idToken,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showSnack('스테이지 정보 재조회 실패: $error');
+      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
       return;
     }
 
     final current = progresses[widget.args.stageId];
     final stageScore = current?.stageScore ?? 0;
-    final isCleared = (current?.isCleared ?? false) || stageScore >= 3;
+    final isCleared = stageScore >= 3;
     if (!mounted) return;
 
     if (isCleared) {
@@ -482,6 +510,14 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
+  void _onJudgmentButtonPressed() {
+    if (_messages.where((m) => m.isUser).isEmpty) {
+      _showSnack('최소 1회 이상 대화를 진행해야 판정할 수 있습니다.');
+      return;
+    }
+    _showJudgmentModal();
+  }
+
   Future<void> _showJudgmentModal() async {
     _judgmentType = null;
     await showDialog<void>(
@@ -633,230 +669,76 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _confirmJudgment(BuildContext dialogContext) async {
     final selected = _judgmentType;
     if (selected == null) return;
+    if (_isConversationOver) {
+      Navigator.pop(dialogContext);
+      _showSnack('이미 종료된 라운드입니다.');
+      return;
+    }
 
-    Navigator.pop(dialogContext); 
+    if (selected != _JudgmentType.scam) {
+      Navigator.pop(dialogContext);
+      return;
+    }
 
     if (_roundId == null) {
       _showSnack('라운드 정보가 없습니다.');
       return;
     }
-    
+    _debugLog('round_id=$_roundId');
+    _debugLog('/messages POST called 여부=$_hasPostedUserMessage');
+    _debugLog('/messages 응답 is_evidence=$_lastMessageIsEvidence');
+    if (!_hasPostedUserMessage) {
+      _showSnack('먼저 메시지를 1회 이상 전송해 주세요.');
+      return;
+    }
     final token = await _resolveIdToken();
     if (token == null || token.isEmpty) {
       _showSnack('인증 토큰을 확인할 수 없습니다.');
       return;
     }
 
+    const judgeBody = <String, dynamic>{'is_fraud_judged': true};
+    _debugLog('/judge 요청 body=$judgeBody');
+    late final JudgeRoundResult judgeResult;
+    try {
+      judgeResult = await _chatRepository.judgeRound(
+        roundId: _roundId!,
+        isFraudJudged: true,
+        idToken: token,
+      );
+    } catch (error) {
+      if (!mounted || !dialogContext.mounted) return;
+      Navigator.pop(dialogContext);
+      _showSnack('판정 처리 실패: $error');
+      return;
+    }
+    _debugLog('/judge 응답 result=${judgeResult.result}');
+    _debugLog('/judge 응답 전체 body=${judgeResult.rawBody}');
+
+    if (!mounted || !dialogContext.mounted) return;
+    Navigator.pop(dialogContext);
+
     setState(() {
-      _isRoundInitializing = true;
-      _roundLoadingText = '판정 및 리포트 생성 중...';
+      _currentScore = judgeResult.currentScore;
+      _currentWarning = judgeResult.currentWarning;
     });
 
-    try {
-      final isFraud = selected == _JudgmentType.scam;
-      
-      final judgeResult = await _chatRepository.judgeRound(
-        roundId: _roundId!,
-        isFraudJudged: isFraud,
-        idToken: token,
-      );
-
-      final report = await _chatRepository.fetchReport(
-        roundId: _roundId!,
-        idToken: token,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _currentScore = judgeResult.currentScore;
-        _currentWarning = judgeResult.currentWarning;
-        _totalRoundsPlayed = judgeResult.totalRoundCount;
-        _isRoundInitializing = false;
-      });
-
-      if (judgeResult.isStageCleared) {
-        _showStageClearDialog(report);
-      } else {
-        _showRoundFeedbackDialog(
-          type: judgeResult.result,
-          score: judgeResult.currentScore,
-          report: report,
-        );
-      }
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _isRoundInitializing = false);
-      _showSnack('판정 처리 실패: $error');
-    }
-  }
-
-  void _showRoundFeedbackDialog({
-    required String type,
-    required int score,
-    required RoundReportDto report,
-  }) {
-    String title;
-    Color titleColor;
-
-    if (type == 'pass') {
-      title = "판정 성공! ($score/3 스택)";
-      titleColor = const Color(0xFF00D64F);
-    } else if (type == 'reset') {
-      title = "초기화됨 (경고 2회 누적)";
-      titleColor = Colors.redAccent;
+    if (judgeResult.result == 'pass') {
+      setState(() => _isConversationOver = true);
+      await _completeRoundFlow(token, shouldShowReport: true);
+    } else if (judgeResult.result == 'reset') {
+      setState(() => _isConversationOver = true);
+      _showSnack('경고가 2회 누적되어 초기화되었습니다.');
+      await _completeRoundFlow(token, shouldShowReport: true);
+    } else if (judgeResult.result == 'warning') {
+      setState(() => _isConversationOver = false);
+      _showSnack('경고가 누적되었습니다. 현재 라운드를 계속 진행하세요.');
+      _debugLog('/report 호출 스킵 (judge result=warning, 라운드 유지)');
     } else {
-      title = "판정 실패 (경고 누적)";
-      titleColor = Colors.orangeAccent;
+      setState(() => _isConversationOver = false);
+      _showSnack('판정 결과: ${judgeResult.result}');
+      _debugLog('/report 호출 스킵 (알 수 없는 judge result)');
     }
-
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF09131E),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF1E2B3D), width: 1.1),
-          ),
-          title: Text(
-            title,
-            style: TextStyle(
-              color: titleColor,
-              fontWeight: FontWeight.w800,
-              fontSize: 18,
-            ),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  report.summary,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    height: 1.4,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (report.fraudPoints.isNotEmpty) ...[
-                  const Text(
-                    "💡 주요 탐지 포인트",
-                    style: TextStyle(
-                      color: Color(0xFF00D64F),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "• ${report.fraudPoints[0]['reason']}",
-                    style: const TextStyle(
-                      color: Color(0xFFA6B1BD),
-                      fontSize: 13,
-                      height: 1.3,
-                    ),
-                  ),
-                  if (report.fraudPoints[0]['tip'] != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4.0),
-                      child: Text(
-                        "Tip: ${report.fraudPoints[0]['tip']}",
-                        style: const TextStyle(
-                          color: Color(0xFF8A98A8),
-                          fontSize: 12,
-                          fontStyle: FontStyle.italic,
-                          height: 1.3,
-                        ),
-                      ),
-                    ),
-                ]
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _prepareRoundAndShowScenarioModal(); 
-              },
-              child: const Text(
-                "다음 대화 진행",
-                style: TextStyle(
-                  color: Color(0xFF00D64F),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showStageClearDialog(RoundReportDto report) {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF09131E),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF00D64F), width: 1.5),
-          ),
-          title: const Text(
-            "🎉 스테이지 클리어!",
-            style: TextStyle(
-              color: Colors.yellowAccent,
-              fontWeight: FontWeight.w800,
-              fontSize: 20,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '총 소요 라운드: $_totalRoundsPlayed',
-                style: const TextStyle(
-                  color: Color(0xFF00D64F),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                report.summary,
-                style: const TextStyle(
-                  color: Colors.white,
-                  height: 1.4,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0B7A33),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text("홈으로 돌아가기"),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Future<String?> _resolveIdToken() async {
@@ -959,6 +841,13 @@ class _ChatScreenState extends State<ChatScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
+  void _debugLog(String message) {
+    if (!kDebugMode) {
+      return;
+    }
+    debugPrint('[RoundDebug] $message');
+  }
+
   @override
   Widget build(BuildContext context) {
     const bgColor = Color(0xFF020911);
@@ -1019,7 +908,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
                       OutlinedButton.icon(
-                        onPressed: _onJudgmentButtonPressed,
+                        onPressed: _isConversationOver
+                            ? null
+                            : _onJudgmentButtonPressed,
                         icon: const Icon(Icons.gavel, size: 16),
                         label: const Text('판정'),
                         style: OutlinedButton.styleFrom(
@@ -1110,6 +1001,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                           child: TextField(
                             controller: _inputController,
+                            enabled: !_isConversationOver,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
@@ -1136,7 +1028,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       ListenableBuilder(
                         listenable: _inputController,
                         builder: (context, _) {
-                          final enabled = _inputController.text.trim().isNotEmpty;
+                          final enabled =
+                              !_isConversationOver &&
+                              _inputController.text.trim().isNotEmpty;
                           return Material(
                             color: enabled
                                 ? outgoingBubbleColor
