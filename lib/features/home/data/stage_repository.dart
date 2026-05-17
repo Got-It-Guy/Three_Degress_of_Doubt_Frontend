@@ -9,6 +9,7 @@ class StageEnterResult {
     required this.warningCount,
     required this.isCleared,
     required this.totalRoundCount,
+    required this.hasIncompleteRound,
   });
 
   final int stageId;
@@ -16,6 +17,7 @@ class StageEnterResult {
   final int warningCount;
   final bool isCleared;
   final int totalRoundCount;
+  final bool hasIncompleteRound;
 }
 
 class StageRepository {
@@ -88,6 +90,7 @@ class StageRepository {
       warningCount: _toInt(data['warning_count']) ?? 0,
       isCleared: _toBool(data['is_cleared']) ?? false,
       totalRoundCount: _toInt(data['total_round_count']) ?? 0,
+      hasIncompleteRound: _toBool(data['has_incomplete_round']) ?? false,
     );
   }
 }

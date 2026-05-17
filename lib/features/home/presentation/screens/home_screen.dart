@@ -94,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       if (!mounted) return;
 
-      if (!enterResult.isCleared && (enterResult.stageScore > 0 || enterResult.warningCount > 0)) {
+      if (enterResult.hasIncompleteRound) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('이전 진행 상황을 불러옵니다.'),
@@ -113,6 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
           initialScore: enterResult.stageScore,
           initialWarning: enterResult.warningCount,
           initialTotalRounds: enterResult.totalRoundCount,
+          hasIncompleteRound: enterResult.hasIncompleteRound,
         ),
       );
       _loadStageProgress();

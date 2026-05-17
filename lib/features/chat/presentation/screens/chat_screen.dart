@@ -15,6 +15,7 @@ class ChatScreenArgs {
     this.initialScore = 0,
     this.initialWarning = 0,
     this.initialTotalRounds = 0,
+    this.hasIncompleteRound = false,
   });
 
   final int stageId;
@@ -22,6 +23,7 @@ class ChatScreenArgs {
   final int initialScore;
   final int initialWarning;
   final int initialTotalRounds;
+  final bool hasIncompleteRound;
 }
 
 class ChatScreen extends StatefulWidget {
@@ -92,6 +94,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     try {
+      _debugLog('enter.has_incomplete_round=${widget.args.hasIncompleteRound}');
       debugPrint('[StageFlow] enter->rounds, stage_id=${widget.args.stageId}');
       final roundResult = await _chatRepository.createRound(
         stageId: widget.args.stageId,
@@ -119,6 +122,8 @@ class _ChatScreenState extends State<ChatScreen> {
           .map((m) => m.content.trim())
           .cast<String?>()
           .firstWhere((e) => e != null, orElse: () => null);
+      final restoredMessages = fetched.map(_fromDto).toList();
+      final hasRestoredMessages = restoredMessages.isNotEmpty;
 
       if (!mounted) return;
       setState(() {
@@ -134,10 +139,20 @@ class _ChatScreenState extends State<ChatScreen> {
               ? _scenarioIntroData.scenarioSummary
               : promptSummary,
         );
-        _hasPostedUserMessage = false;
+        _messages
+          ..clear()
+          ..addAll(restoredMessages);
+        _hasPostedUserMessage = restoredMessages.any((m) => m.isUser);
         _lastMessageIsEvidence = null;
+        _isConversationOver = false;
+        _isTyping = false;
         _isRoundInitializing = false;
       });
+
+      if (hasRestoredMessages) {
+        _scrollToBottom();
+        return;
+      }
 
       await _showScenarioIntroModal();
     } catch (_) {
