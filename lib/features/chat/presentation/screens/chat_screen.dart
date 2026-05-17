@@ -258,8 +258,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final current = progresses[widget.args.stageId];
     final stageScore = current?.stageScore ?? 0;
+    final warningCount = current?.warningCount ?? 0;
     final isCleared = stageScore >= 3;
     if (!mounted) return;
+
+    setState(() {
+      _currentScore = stageScore;
+      _currentWarning = warningCount;
+    });
 
     if (isCleared) {
       Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);

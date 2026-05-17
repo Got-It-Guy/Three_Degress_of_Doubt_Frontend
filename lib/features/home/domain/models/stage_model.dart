@@ -4,6 +4,7 @@ class StageProgress {
   final String description;
   final String? thumbnailUrl;
   final int stageScore;
+  final int warningCount;
   final bool isCleared;
   final int bestRoundCount;
 
@@ -13,6 +14,7 @@ class StageProgress {
     required this.description,
     this.thumbnailUrl,
     required this.stageScore,
+    this.warningCount = 0,
     required this.isCleared,
     this.bestRoundCount = 0,
   });
@@ -24,6 +26,7 @@ class StageProgress {
       description: json['description']?.toString() ?? '',
       thumbnailUrl: json['thumbnail_url']?.toString(),
       stageScore: json['stage_score'] as int? ?? 0,
+      warningCount: json['warning_count'] as int? ?? 0,
       isCleared: json['is_cleared'] as bool? ?? false,
       bestRoundCount: json['best_round_count'] as int? ?? 0,
     );
@@ -35,6 +38,7 @@ class StageProgress {
     String? description,
     String? thumbnailUrl,
     int? stageScore,
+    int? warningCount,
     bool? isCleared,
     int? bestRoundCount,
   }) {
@@ -44,6 +48,7 @@ class StageProgress {
       description: description ?? this.description,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       stageScore: stageScore ?? this.stageScore,
+      warningCount: warningCount ?? this.warningCount,
       isCleared: isCleared ?? this.isCleared,
       bestRoundCount: bestRoundCount ?? this.bestRoundCount,
     );
