@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -714,6 +715,9 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     _debugLog('/judge 응답 result=${judgeResult.result}');
     _debugLog('/judge 응답 전체 body=${judgeResult.rawBody}');
+    _debugLog(
+      '/judge 응답 JSON=\n${const JsonEncoder.withIndent('  ').convert(judgeResult.rawBody)}',
+    );
 
     if (!mounted || !dialogContext.mounted) return;
     Navigator.pop(dialogContext);
