@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:three_degress_of_doubt_frontend/core/config/backend_config.dart';
 
 class ChatMessageDto {
@@ -148,6 +151,11 @@ class ChatRepository {
       throw StateError('Round create response is not a valid JSON object.');
     }
     final data = _asMap(payload['data']);
+    if (kDebugMode) {
+      final pretty = const JsonEncoder.withIndent('  ').convert(payload);
+      debugPrint('[RoundStart] raw response =\n$pretty');
+      debugPrint('[RoundStart] situation_prompt = ${data?['situation_prompt']}');
+    }
     final roundId = _extractRoundId(payload, data);
     if (roundId == null) {
       throw StateError('Round create response does not contain round_id.');
@@ -418,16 +426,71 @@ class ChatRepository {
   }
 
   SituationPromptDto? _parseSituationPrompt(dynamic raw) {
+    if (raw is String) {
+      final text = raw.trim();
+      if (text.isEmpty) {
+        return null;
+      }
+      return _parseSituationPromptFromString(text);
+    }
+
     final prompt = _asMap(raw);
     if (prompt == null) {
       return null;
     }
-    final situation = prompt['situation']?.toString().trim() ?? '';
-    final currentStage = prompt['current_stage']?.toString().trim() ?? '';
-    final userIntent = prompt['user_intent']?.toString().trim() ?? '';
+    final situation =
+        prompt['situation']?.toString().trim() ??
+        prompt['situation_prompt']?.toString().trim() ??
+        '';
+    final currentStage =
+        prompt['current_stage']?.toString().trim() ??
+        prompt['currentStage']?.toString().trim() ??
+        '';
+    final userIntent =
+        prompt['user_intent']?.toString().trim() ??
+        prompt['userIntent']?.toString().trim() ??
+        '';
     if (situation.isEmpty && currentStage.isEmpty && userIntent.isEmpty) {
       return null;
     }
+    return SituationPromptDto(
+      situation: situation,
+      currentStage: currentStage,
+      userIntent: userIntent,
+    );
+  }
+
+  SituationPromptDto _parseSituationPromptFromString(String text) {
+    String situation = '';
+    String currentStage = '';
+    String userIntent = '';
+
+    for (final rawLine in text.split('\n')) {
+      final line = rawLine.trim();
+      if (line.isEmpty) {
+        continue;
+      }
+      if (line.startsWith('상황:')) {
+        situation = line.substring('상황:'.length).trim();
+        continue;
+      }
+      if (line.startsWith('현재 단계:')) {
+        currentStage = line.substring('현재 단계:'.length).trim();
+        continue;
+      }
+      if (line.startsWith('내가 하려는 것:')) {
+        userIntent = line.substring('내가 하려는 것:'.length).trim();
+        continue;
+      }
+      if (line.startsWith('의도:')) {
+        userIntent = line.substring('의도:'.length).trim();
+      }
+    }
+
+    if (situation.isEmpty && currentStage.isEmpty && userIntent.isEmpty) {
+      situation = text;
+    }
+
     return SituationPromptDto(
       situation: situation,
       currentStage: currentStage,
