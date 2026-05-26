@@ -65,7 +65,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _currentWarning = widget.args.initialWarning;
     _scenarioIntroData = _scenarioDataByStageId(widget.args.stageId);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _prepareRoundAndShowScenarioModal();
+      _prepareRoundAndShowScenarioModal(allowRestore: true);
     });
   }
 
@@ -76,7 +76,9 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  Future<void> _prepareRoundAndShowScenarioModal() async {
+  Future<void> _prepareRoundAndShowScenarioModal({
+    bool allowRestore = false,
+  }) async {
     if (!mounted || _isRoundInitializing) return;
 
     setState(() {
@@ -125,7 +127,9 @@ class _ChatScreenState extends State<ChatScreen> {
       final restoredMessages = fetched.map(_fromDto).toList();
       final hasRestoredMessages = restoredMessages.isNotEmpty;
       final shouldRestoreConversation =
-          widget.args.hasIncompleteRound && hasRestoredMessages;
+          allowRestore &&
+          widget.args.hasIncompleteRound &&
+          hasRestoredMessages;
 
       if (!mounted) return;
       setState(() {
@@ -303,7 +307,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _isTyping = false;
     });
 
-    await _prepareRoundAndShowScenarioModal();
+    await _prepareRoundAndShowScenarioModal(allowRestore: false);
   }
 
   Future<void> _completeRoundFlow(
