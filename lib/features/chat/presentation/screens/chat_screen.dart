@@ -124,6 +124,8 @@ class _ChatScreenState extends State<ChatScreen> {
           .firstWhere((e) => e != null, orElse: () => null);
       final restoredMessages = fetched.map(_fromDto).toList();
       final hasRestoredMessages = restoredMessages.isNotEmpty;
+      final shouldRestoreConversation =
+          widget.args.hasIncompleteRound && hasRestoredMessages;
 
       if (!mounted) return;
       setState(() {
@@ -139,17 +141,20 @@ class _ChatScreenState extends State<ChatScreen> {
               ? _scenarioIntroData.scenarioSummary
               : promptSummary,
         );
-        _messages
-          ..clear()
-          ..addAll(restoredMessages);
-        _hasPostedUserMessage = restoredMessages.any((m) => m.isUser);
+        _messages.clear();
+        if (shouldRestoreConversation) {
+          _messages.addAll(restoredMessages);
+        }
+        _hasPostedUserMessage = shouldRestoreConversation
+            ? restoredMessages.any((m) => m.isUser)
+            : false;
         _lastMessageIsEvidence = null;
         _isConversationOver = false;
         _isTyping = false;
         _isRoundInitializing = false;
       });
 
-      if (hasRestoredMessages) {
+      if (shouldRestoreConversation) {
         _scrollToBottom();
         return;
       }
