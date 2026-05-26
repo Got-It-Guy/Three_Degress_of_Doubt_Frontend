@@ -152,9 +152,10 @@ class ChatRepository {
     }
     final data = _asMap(payload['data']);
     if (kDebugMode) {
-      final pretty = const JsonEncoder.withIndent('  ').convert(payload);
-      debugPrint('[RoundStart] raw response =\n$pretty');
-      debugPrint('[RoundStart] situation_prompt = ${data?['situation_prompt']}');
+      final rawJson = response.data is String
+          ? response.data as String
+          : jsonEncode(response.data);
+      debugPrint('[RoundStart] raw response = $rawJson');
     }
     final roundId = _extractRoundId(payload, data);
     if (roundId == null) {
