@@ -437,6 +437,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _showScenarioIntroModal() async {
     final aiName = _scenarioIntroData.counterpartInfo; 
+    final summary = _scenarioIntroData.scenarioSummary.trim();
 
     await showDialog<void>(
       context: context,
@@ -468,6 +469,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 const SizedBox(height: 14),
                 
                 _buildIntroSection('수신 정보', '$aiName에게서 메시지가 도착했습니다.'),
+                const SizedBox(height: 10),
+                _buildIntroSection(
+                  '시나리오 설명',
+                  summary.isEmpty ? '시나리오 정보가 아직 준비되지 않았습니다.' : summary,
+                ),
                 
                 const SizedBox(height: 18),
                 SizedBox(
