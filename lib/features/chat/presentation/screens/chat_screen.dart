@@ -117,6 +117,18 @@ class _ChatScreenState extends State<ChatScreen> {
       final promptSummary = _buildScenarioSummaryFromPrompt(
         roundResult.situationPrompt,
       );
+      final prompt = roundResult.situationPrompt;
+      final isPromptEmpty = promptSummary.trim().isEmpty;
+      _debugLog(
+        '/rounds response prompt'
+        ' situation="${prompt?.situation ?? ''}"'
+        ' current_stage="${prompt?.currentStage ?? ''}"'
+        ' user_intent="${prompt?.userIntent ?? ''}"',
+      );
+      _debugLog(
+        '/rounds promptSummary.isEmpty=$isPromptEmpty'
+        ' (true면 scenarioSummary fallback 사용)',
+      );
 
       final initialFromRound = roundResult.initialMessage;
       final firstAi = fetched
@@ -130,6 +142,11 @@ class _ChatScreenState extends State<ChatScreen> {
           allowRestore &&
           widget.args.hasIncompleteRound &&
           hasRestoredMessages;
+      _debugLog(
+        '/rounds initial_message.content="${initialFromRound?.content ?? ''}" '
+        'fetched_messages_count=${restoredMessages.length} '
+        'shouldRestoreConversation=$shouldRestoreConversation',
+      );
 
       if (!mounted) return;
       setState(() {
