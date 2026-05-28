@@ -75,9 +75,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     } on Exception {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('로그아웃 중 오류가 발생했습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('로그아웃 중 오류가 발생했습니다.')));
     } finally {
       if (mounted) {
         setState(() => _isSigningOut = false);
@@ -188,7 +188,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 12.0,
+              ),
               child: Row(
                 children: [
                   Material(
@@ -200,7 +203,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: const SizedBox(
                         width: 40,
                         height: 40,
-                        child: Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                        child: Icon(
+                          Icons.arrow_back,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ),
@@ -259,12 +266,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             const SizedBox(height: 4),
                             TextButton(
-                              onPressed:
-                                  _isLoadingProfile ? null : _loadMyProfile,
+                              onPressed: _isLoadingProfile
+                                  ? null
+                                  : _loadMyProfile,
                               style: TextButton.styleFrom(
                                 foregroundColor: subtitleColor,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
                               ),
                               child: const Text('다시 시도'),
                             ),
@@ -289,8 +298,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               borderColor,
                               true,
                               () {
-                                Navigator.pushNamed(
-                                    context, '/metadata-setup');
+                                Navigator.pushNamed(context, '/metadata-setup');
                               },
                             ),
                             _buildMenuItem(
@@ -299,7 +307,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               subtitleColor,
                               borderColor,
                               true,
-                              () {},
+                              () async {
+                                final result = await Navigator.pushNamed(
+                                  context,
+                                  '/account-settings',
+                                );
+
+                                if (result == true) {
+                                  _loadMyProfile();
+                                }
+                              },
                             ),
                             _buildMenuItem(
                               Icons.help_outline,
@@ -327,7 +344,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: logoutRed.withAlpha(75)),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     foregroundColor: logoutRed,
                   ),
                   child: _isSigningOut
@@ -344,7 +362,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Text(
                               '로그아웃',
                               style: TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.w600),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ),

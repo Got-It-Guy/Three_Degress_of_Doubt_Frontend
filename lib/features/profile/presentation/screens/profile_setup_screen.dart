@@ -115,10 +115,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
       if (!mounted) return;
 
-      // [핵심 변경] 신규 유저 닉네임 설정 완료 후 메타데이터 설정 화면으로 이동
-      // pushReplacementNamed를 사용하여 이 화면을 스택에서 제거합니다.
       Navigator.pushReplacementNamed(context, '/metadata-setup');
-
     } on Exception catch (error) {
       if (mounted) {
         _showError(_mapError(error));
@@ -231,7 +228,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             foregroundColor: Colors.white,
                             backgroundColor: cardColor,
                           ),
-                          icon: const Icon(Icons.photo_library_outlined, size: 18),
+                          icon: const Icon(
+                            Icons.photo_library_outlined,
+                            size: 18,
+                          ),
                           label: Text(
                             _selectedImage == null
                                 ? '갤러리에서 이미지 선택'
@@ -244,10 +244,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: () => setState(() => _selectedImage = null),
+                            onPressed: () =>
+                                setState(() => _selectedImage = null),
                             style: TextButton.styleFrom(
                               foregroundColor: subtitleColor,
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
                             ),
                             child: const Text('선택 해제'),
                           ),
