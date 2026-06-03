@@ -183,6 +183,15 @@ class _MetadataSetupScreenState extends State<MetadataSetupScreen> {
                       height: 1.4,
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "시뮬레이션을 통한 사기 예방이 목적이므로 실제 개인정보는 입력하지 말아 주세요.",
+                    style: TextStyle(
+                      color: Color(0xFF9AA4B2),
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
                   const SizedBox(height: 40),
                   _buildSelectableTile(
                     "연령대",
