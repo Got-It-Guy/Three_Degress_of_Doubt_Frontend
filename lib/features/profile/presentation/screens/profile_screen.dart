@@ -324,7 +324,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               subtitleColor,
                               borderColor,
                               false,
-                              () {},
+                              () {
+                                Navigator.pushNamed(context, '/game-help');
+                              },
                             ),
                           ],
                         ),
